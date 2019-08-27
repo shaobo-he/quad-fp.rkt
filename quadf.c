@@ -40,7 +40,7 @@ void mulq(_qf* a, _qf* b, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void div(_qf* a, _qf* b, _qf* r) {
+void divq(_qf* a, _qf* b, _qf* r) {
   __float128 qa;
   __float128 qb;
   __float128 qr;
