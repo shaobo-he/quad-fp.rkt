@@ -10,18 +10,21 @@
 
 (define-ffi-definer define-quad (ffi-lib "libquadf"))
 
+(define-simple-macro (define-binary-op op-name:id)
+                     (define-quad op-name
+                                  (_fun _Quad-pointer
+                                        _Quad-pointer
+                                        (r : (_ptr o _Quad))
+                                        -> _void
+                                        -> r)))
+
 (define-syntax (define-binary-ops stx)
-  (syntax-parse stx
-    [(_) #'(begin)]
-    [(_ var more ...)
-     #'(begin
-         (define-quad var
-           (_fun _Quad-pointer
-                 _Quad-pointer
-                 (r : (_ptr o _Quad))
-                 -> _void
-                 -> r))
-         (define-binary-ops more ...))]))
+  (datum->syntax
+    stx
+    `(begin
+       ,@(map
+           (λ (op-name) `(define-binary-op ,op-name))
+           (cdr (syntax->datum stx))))))
 
 (define-binary-ops addq subq mulq divq)
 
