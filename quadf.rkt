@@ -19,12 +19,9 @@
                                         -> r)))
 
 (define-syntax (define-binary-ops stx)
-  (datum->syntax
-    stx
-    `(begin
-       ,@(map
-           (λ (op-name) `(define-binary-op ,op-name))
-           (cdr (syntax->datum stx))))))
+  (syntax-case stx ()
+               [(_ op-name ...)
+                #'(begin (define-binary-op op-name)...)]))
 
 (define-binary-ops addq subq mulq divq)
 
