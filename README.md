@@ -1,2 +1,2 @@
 # Pickles-III
-Quadruple-precision floating-point for Racket
+A toy Racket binding to libquadmath
