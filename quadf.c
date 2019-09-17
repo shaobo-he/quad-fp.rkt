@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <quadmath.h>
 
 
 typedef struct {
@@ -47,6 +48,22 @@ void divq(_qf* a, _qf* b, _qf* r) {
   memcpy(&qa, a, sizeof(qa));
   memcpy(&qb, b, sizeof(qb));
   qr = qa / qb;
+  memcpy(r, &qr, sizeof(qr));
+}
+
+void absq(_qf* a, _qf* r) {
+  __float128 qa;
+  __float128 qr;
+  memcpy(&qa, a, sizeof(qa));
+  qr = fabsq(qa);
+  memcpy(r, &qr, sizeof(qr));
+}
+
+void sqrtq(_qf* a, _qf* r) {
+  __float128 qa;
+  __float128 qr;
+  memcpy(&qa, a, sizeof(qa));
+  qr = sqrtq(qa);
   memcpy(r, &qr, sizeof(qr));
 }
 

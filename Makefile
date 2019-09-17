@@ -5,16 +5,12 @@ else
 endif
 
 SHARED_LIB = libquadf.$(SO)
-OBJ_FILE = quadf.o
 SRC_FILE = quadf.c
 
 all: $(SHARED_LIB)
 
-$(SHARED_LIB): $(OBJ_FILE)
-	clang -shared -o $(SHARED_LIB) $(OBJ_FILE)
-
-$(OBJ_FILE): $(SRC_FILE)
-	clang -c -O3 $(SRC_FILE)
+$(SHARED_LIB): $(SRC_FILE)
+	gcc -shared -o $(SHARED_LIB) $(SRC_FILE) -lquadmath -fPIC -O3
 
 clean:
 	rm -f *.so *.o

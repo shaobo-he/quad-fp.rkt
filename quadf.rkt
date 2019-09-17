@@ -3,27 +3,41 @@
 (require ffi/unsafe
          ffi/unsafe/define
          (for-syntax racket/base
-                     syntax/parse)
-         syntax/parse/define)
+                     syntax/parse))
+
+(provide addq
+         subq
+         mulq
+         divq
+         absq
+         sqrtq
+         Quad-fh
+         Quad-sh
+         df2qf
+         qf2df)
 
 (define-cstruct _Quad ([fh _uint64] [sh _uint64]))
 
 (define-ffi-definer define-quad (ffi-lib "libquadf"))
 
-(define-simple-macro (define-binary-op op-name:id)
-                     (define-quad op-name
-                                  (_fun _Quad-pointer
-                                        _Quad-pointer
-                                        (r : (_ptr o _Quad))
-                                        -> _void
-                                        -> r)))
-
-(define-syntax (define-binary-ops stx)
+(define-syntax (define-nary-ops stx)
   (syntax-case stx ()
-               [(_ op-name ...)
-                #'(begin (define-binary-op op-name)...)]))
+    [(_ arity op-name ...)
+     (with-syntax ([(args ...)
+                    (datum->syntax
+                     stx
+                     (build-list
+                      (syntax->datum #'arity)
+                      (λ (x) '_Quad-pointer)))])
+       #'(begin (define-quad op-name
+                  (_fun args ...
+                        (r : (_ptr o _Quad))
+                        -> _void
+                        -> r)) ...))
+     ]))
 
-(define-binary-ops addq subq mulq divq)
+(define-nary-ops 2 addq subq mulq divq)
+(define-nary-ops 1 absq sqrtq)
 
 (define-quad df2qf (_fun _double
                          (r : (_ptr o _Quad))
@@ -32,16 +46,3 @@
 
 (define-quad qf2df (_fun _Quad-pointer 
                          -> _double))
-
-(define q1 (df2qf 1.0))
-(define q2 (df2qf 2.0))
-
-(displayln (Quad-fh q1))
-(displayln (Quad-sh q1))
-
-(displayln (Quad-fh q2))
-(displayln (Quad-sh q2))
-
-(define q3 (mulq q1 q2))
-(displayln (Quad-fh q3))
-(displayln (Quad-sh q3))
