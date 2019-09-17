@@ -33,8 +33,7 @@
                   (_fun args ...
                         (r : (_ptr o _Quad))
                         -> _void
-                        -> r)) ...))
-     ]))
+                        -> r)) ...))]))
 
 (define-nary-ops 2 addq subq mulq divq)
 (define-nary-ops 1 absq sqrtq)
