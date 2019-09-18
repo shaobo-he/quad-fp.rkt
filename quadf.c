@@ -11,7 +11,7 @@ typedef struct {
 } _qf;
 
 // simple arithmetic
-void addq(_qf* a, _qf* b, _qf* r) {
+void addQ(_qf* a, _qf* b, _qf* r) {
   __float128 qa;
   __float128 qb;
   __float128 qr;
@@ -21,7 +21,7 @@ void addq(_qf* a, _qf* b, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void subq(_qf* a, _qf* b, _qf* r) {
+void subQ(_qf* a, _qf* b, _qf* r) {
   __float128 qa;
   __float128 qb;
   __float128 qr;
@@ -31,7 +31,7 @@ void subq(_qf* a, _qf* b, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void mulq(_qf* a, _qf* b, _qf* r) {
+void mulQ(_qf* a, _qf* b, _qf* r) {
   __float128 qa;
   __float128 qb;
   __float128 qr;
@@ -41,7 +41,7 @@ void mulq(_qf* a, _qf* b, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void divq(_qf* a, _qf* b, _qf* r) {
+void divQ(_qf* a, _qf* b, _qf* r) {
   __float128 qa;
   __float128 qb;
   __float128 qr;
@@ -51,7 +51,7 @@ void divq(_qf* a, _qf* b, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void absq(_qf* a, _qf* r) {
+void absQ(_qf* a, _qf* r) {
   __float128 qa;
   __float128 qr;
   memcpy(&qa, a, sizeof(qa));
@@ -59,7 +59,7 @@ void absq(_qf* a, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
-void sqrtq(_qf* a, _qf* r) {
+void sqrtQ(_qf* a, _qf* r) {
   __float128 qa;
   __float128 qr;
   memcpy(&qa, a, sizeof(qa));
@@ -67,6 +67,49 @@ void sqrtq(_qf* a, _qf* r) {
   memcpy(r, &qr, sizeof(qr));
 }
 
+// binary relations
+typedef unsigned char BOOL_RES;
+BOOL_RES eqQ(_qf* a, _qf* b) {
+  __float128 qa;
+  __float128 qb;
+  memcpy(&qa, a, sizeof(qa));
+  memcpy(&qb, b, sizeof(qb));
+  return qa == qb;
+}
+
+BOOL_RES ltQ(_qf* a, _qf* b) {
+  __float128 qa;
+  __float128 qb;
+  memcpy(&qa, a, sizeof(qa));
+  memcpy(&qb, b, sizeof(qb));
+  return qa < qb;
+}
+
+BOOL_RES leQ(_qf* a, _qf* b) {
+  __float128 qa;
+  __float128 qb;
+  memcpy(&qa, a, sizeof(qa));
+  memcpy(&qb, b, sizeof(qb));
+  return qa <= qb;
+}
+
+BOOL_RES gtQ(_qf* a, _qf* b) {
+  __float128 qa;
+  __float128 qb;
+  memcpy(&qa, a, sizeof(qa));
+  memcpy(&qb, b, sizeof(qb));
+  return qa > qb;
+}
+
+BOOL_RES geQ(_qf* a, _qf* b) {
+  __float128 qa;
+  __float128 qb;
+  memcpy(&qa, a, sizeof(qa));
+  memcpy(&qb, b, sizeof(qb));
+  return qa >= qb;
+}
+
+// conversions
 void df2qf(double d, _qf* r) {
   __float128 qv = (__float128)d;
   memcpy(r, &qv, sizeof(qv));

@@ -1,8 +1,10 @@
 #lang racket/base
 
 (require rackunit
-         "quadf.rkt")
+         "quadf-typed.rkt")
 
 (let* ([d 1.0]
-       [q (df2qf d)])
-  (check-equal? (qf2df (addq q q)) 2.0 "Simple addition"))
+       [q (double-flonum->quad-flonum d)]
+       [qq (qf+ q q)])
+  (check-equal? (quad-flonum->double-flonum qq) 2.0 "Simple addition")
+  (check-true (qf= q q) "Identity true"))
