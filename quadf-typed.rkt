@@ -1,9 +1,5 @@
 #lang typed/racket/base
 
-(require (for-syntax racket/base
-                     racket/syntax
-                     syntax/parse))
-
 (require/typed/provide
  "quadf.rkt"
  [#:opaque Quad-Flonum Quad?]
