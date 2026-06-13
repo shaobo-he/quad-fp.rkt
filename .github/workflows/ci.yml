@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # gcc (with libquadmath + quadmath.h) is preinstalled on the runner.
+      - name: Install Racket
+        uses: Bogdanp/setup-racket@v1
+        with:
+          version: stable
+
+      - name: Show toolchain
+        run: |
+          gcc --version | head -1
+          racket --version
+
+      # `make test` builds libquadf.so, then runs the rackunit suite.
+      - name: Build and test
+        run: make test
