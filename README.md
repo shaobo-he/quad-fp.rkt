@@ -1,4 +1,6 @@
-# Pickles-III
+# quad-fp.rkt
+
+[![CI](https://github.com/shaobo-he/quad-fp.rkt/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/shaobo-he/quad-fp.rkt/actions/workflows/ci.yml)
 
 A toy [Racket](https://racket-lang.org) binding to GCC's
 [libquadmath](https://gcc.gnu.org/onlinedocs/libquadmath/), exposing IEEE 754
