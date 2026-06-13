@@ -16,20 +16,20 @@
   (define c-src (build-path collection-dir "quadf.c"))
   (define so-out
     (build-path collection-dir
-                (bytes->string/utf-8
-                 (bytes-append #"libquadf" (system-type 'so-suffix)))))
-  (define cc (or (find-executable-path "gcc")
-                 (find-executable-path "cc")))
+                (bytes->string/utf-8 (bytes-append #"libquadf" (system-type 'so-suffix)))))
+  (define cc (or (find-executable-path "gcc") (find-executable-path "cc")))
   (unless cc
-    (error 'quad-fp
-           "cannot build ~a: no gcc/cc found on PATH" so-out))
+    (error 'quad-fp "cannot build ~a: no gcc/cc found on PATH" so-out))
   (printf "quad-fp: compiling ~a -> ~a\n" c-src so-out)
   (define ok?
     (apply system*
-           cc "-shared" "-fPIC" "-O3"
-           "-o" (path->string so-out)
+           cc
+           "-shared"
+           "-fPIC"
+           "-O3"
+           "-o"
+           (path->string so-out)
            (path->string c-src)
            '("-lquadmath")))
   (unless ok?
-    (error 'quad-fp
-           "failed to compile ~a (need gcc + libquadmath installed)" so-out)))
+    (error 'quad-fp "failed to compile ~a (need gcc + libquadmath installed)" so-out)))

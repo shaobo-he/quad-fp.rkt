@@ -8,14 +8,10 @@
 (define license 'MIT)
 
 ;; Runtime: typed-racket-lib backs quadf-typed.rkt.
-(define deps '("base"
-               "typed-racket-lib"))
+(define deps '("base" "typed-racket-lib"))
 
 ;; Build/test only: tests, and docs.
-(define build-deps '("rackunit-lib"
-                     "scribble-lib"
-                     "racket-doc"
-                     "typed-racket-doc"))
+(define build-deps '("rackunit-lib" "scribble-lib" "racket-doc" "typed-racket-doc"))
 
 (define scribblings '(("scribblings/quad-fp.scrbl" ())))
 

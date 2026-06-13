@@ -8,8 +8,10 @@
          "quadf-typed.rkt")
 
 ;; Shorthands: lift a Racket double into a quad and back.
-(define (qf x) (double-flonum->quad-flonum x))
-(define (df q) (quad-flonum->double-flonum q))
+(define (qf x)
+  (double-flonum->quad-flonum x))
+(define (df q)
+  (quad-flonum->double-flonum q))
 
 ;; Approximate equality, for results that aren't bit-exact (transcendentals
 ;; aren't guaranteed correctly-rounded). Tolerance is a few dozen quad ULPs.
@@ -17,10 +19,10 @@
   (qf< (qfabs (qf- a b)) (qf* quad-epsilon (qf 64.0))))
 
 (test-case "arithmetic"
-  (check-equal? (df (qf+ (qf 1.0) (qf 1.0))) 2.0  "add")
-  (check-equal? (df (qf- (qf 3.0) (qf 1.0))) 2.0  "sub")
-  (check-equal? (df (qf* (qf 2.0) (qf 3.0))) 6.0  "mul")
-  (check-equal? (df (qf/ (qf 6.0) (qf 2.0))) 3.0  "div"))
+  (check-equal? (df (qf+ (qf 1.0) (qf 1.0))) 2.0 "add")
+  (check-equal? (df (qf- (qf 3.0) (qf 1.0))) 2.0 "sub")
+  (check-equal? (df (qf* (qf 2.0) (qf 3.0))) 6.0 "mul")
+  (check-equal? (df (qf/ (qf 6.0) (qf 2.0))) 3.0 "div"))
 
 (test-case "unary math"
   (check-equal? (df (qfabs (qf -5.0))) 5.0 "abs")
@@ -58,25 +60,25 @@
 (test-case "comparisons"
   (define a (qf 1.0))
   (define b (qf 2.0))
-  (check-true  (qf=  a a) "= reflexive")
-  (check-false (qf=  a b) "= distinct")
-  (check-true  (qf<  a b) "< true")
-  (check-false (qf<  a a) "< not reflexive")
-  (check-true  (qf<= a a) "<= reflexive")
-  (check-true  (qf>  b a) "> true")
-  (check-true  (qf>= a a) ">= reflexive")
+  (check-true (qf= a a) "= reflexive")
+  (check-false (qf= a b) "= distinct")
+  (check-true (qf< a b) "< true")
+  (check-false (qf< a a) "< not reflexive")
+  (check-true (qf<= a a) "<= reflexive")
+  (check-true (qf> b a) "> true")
+  (check-true (qf>= a a) ">= reflexive")
   (check-false (qf>= a b) ">= false"))
 
 (test-case "classification"
   (define nan (qf/ (qf 0.0) (qf 0.0)))
   (define inf (qf/ (qf 1.0) (qf 0.0)))
-  (check-true  (qfnan? nan) "nan? of 0/0")
+  (check-true (qfnan? nan) "nan? of 0/0")
   (check-false (qfnan? (qf 1.0)) "nan? of finite")
-  (check-true  (qfinfinite? inf) "infinite? of 1/0")
+  (check-true (qfinfinite? inf) "infinite? of 1/0")
   (check-false (qfinfinite? (qf 1.0)) "infinite? of finite")
-  (check-true  (qffinite? (qf 1.0)) "finite? of finite")
+  (check-true (qffinite? (qf 1.0)) "finite? of finite")
   (check-false (qffinite? inf) "finite? of inf")
-  (check-true  (qfsignbit? (qf -1.0)) "signbit of negative")
+  (check-true (qfsignbit? (qf -1.0)) "signbit of negative")
   (check-false (qfsignbit? (qf 1.0)) "signbit of positive"))
 
 (test-case "double <-> quad round-trip"
@@ -108,11 +110,12 @@
   (check-equal? (+ 1.0 1e-20) 1.0 "double loses the tiny addend")
   (define sum (qf+ (qf 1.0) (qf 1e-20)))
   (check-false (qf= sum (qf 1.0)) "quad keeps the tiny addend")
-  (check-true  (qf> sum (qf 1.0)) "and the kept value is larger"))
+  (check-true (qf> sum (qf 1.0)) "and the kept value is larger"))
 
 (test-case "quad-flonum->bytes"
   (check-equal? (bytes-length (quad-flonum->bytes (qf 1.0))) 16 "16 bytes wide")
   ;; 0.0 is all-zero bits regardless of endianness.
   (check-equal? (quad-flonum->bytes (qf 0.0)) (make-bytes 16 0) "zero is all-zero bits")
-  (check-not-equal? (quad-flonum->bytes (qf 1.0)) (quad-flonum->bytes (qf 2.0))
+  (check-not-equal? (quad-flonum->bytes (qf 1.0))
+                    (quad-flonum->bytes (qf 2.0))
                     "distinct -> distinct bytes"))
