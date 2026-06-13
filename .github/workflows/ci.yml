@@ -14,7 +14,7 @@ jobs:
 
       # gcc (with libquadmath + quadmath.h) is preinstalled on the runner.
       - name: Install Racket
-        uses: Bogdanp/setup-racket@v1
+        uses: Bogdanp/setup-racket@v1.15
         with:
           version: stable
 
