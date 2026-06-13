@@ -65,10 +65,28 @@ does) the binding works from any working directory.
 (qf= (qf+ a b) a)                        ; => #f
 ```
 
-The API: `qf+ qf- qf* qf/` (arithmetic), `qfabs qfsqrt`, the relations
-`qf= qf< qf<= qf> qf>=`, and the conversions `double-flonum->quad-flonum` /
-`quad-flonum->double-flonum`. The typed module additionally provides
-`quad-flonum->bytes`.
+The API mirrors libquadmath's real-valued surface:
+
+- **Arithmetic** — `qf+ qf- qf* qf/`
+- **Elementary** — roots/powers (`qfsqrt qfcbrt qfpow qfhypot`), exp/log
+  (`qfexp qfexp2 qfexpm1 qflog qflog2 qflog10 qflog1p`), trig and inverses
+  (`qfsin qfcos qftan qfasin qfacos qfatan qfatan2`), hyperbolics
+  (`qfsinh … qfatanh`)
+- **Rounding** — `qfceil qffloor qftrunc qfround qfrint qfnearbyint qfabs`
+- **Special** — `qferf qferfc qflgamma qftgamma`, Bessel `qfj0 qfj1 qfy0 qfy1`
+- **Misc binary** — `qffmod qfremainder qfcopysign qffdim qfmax qfmin
+  qfnextafter qflogb` and the fused multiply-add `qffma`
+- **Comparison** — `qf= qf< qf<= qf> qf>=`
+- **Classification** — `qfnan? qfinfinite? qffinite? qfsignbit? qfsignaling?`
+- **Conversion** — `double-flonum->quad-flonum` / `quad-flonum->double-flonum`,
+  full-precision `string->quad-flonum` / `quad-flonum->string`, and (typed
+  module) `quad-flonum->bytes`
+- **Constants** — `quad-pi quad-e quad-sqrt2 …`, plus `quad-max quad-epsilon`
+  and format characteristics like `quad-mant-dig` (113)
+
+See the [Scribble docs](scribblings/quad-fp.scrbl) for the full list. Complex
+(`__complex128`) functions and the multi-result functions (`frexpq`, `sincosq`,
+…) are not yet bound.
 
 ## License
 
