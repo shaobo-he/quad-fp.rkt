@@ -51,4 +51,4 @@ The API: `qf+ qf- qf* qf/` (arithmetic), `qfabs qfsqrt`, the relations
 
 ## License
 
-[CRAPL](CRAPL-LICENSE.txt) — an academic-strength "use at your own risk" license.
+[MIT](LICENSE) © Shaobo He
