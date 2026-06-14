@@ -23,15 +23,17 @@ jobs:
           gcc --version | head -1
           racket --version
 
-      # Developer workflow: build libquadf.so via the Makefile, run the suite.
-      - name: Build and test (make)
-        run: make test
-
-      # Catalog workflow: install as a package — this runs the native build
-      # hook (private/build-native.rkt) and builds the docs, mirroring what
-      # pkgs.racket-lang.org's build server does — then run the tests.
+      # Catalog workflow first: installing as a package pulls the deps and
+      # build-deps (typed-racket-lib, rackcheck-lib, math-lib, …), runs the
+      # native build hook (private/build-native.rkt), and builds the docs —
+      # mirroring what pkgs.racket-lang.org's build server does.
       - name: Install as a package
         run: raco pkg install --auto --name quad-fp
 
       - name: Test installed package
         run: raco test --collection quad-fp
+
+      # Developer workflow: rebuild libquadf via the Makefile and run the suite
+      # directly. Comes after the install so the test deps are available.
+      - name: Build and test (make)
+        run: make test
