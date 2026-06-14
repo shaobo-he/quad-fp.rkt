@@ -10,8 +10,9 @@
 ;; Runtime: typed-racket-lib backs quadf-typed.rkt.
 (define deps '("base" "typed-racket-lib"))
 
-;; Build/test only: tests, and docs.
-(define build-deps '("rackunit-lib" "scribble-lib"))
+;; Build/test only: tests, and docs (racket-doc supplies the cross-reference
+;; targets the Scribble doc links to, e.g. `require` and `flonum?`).
+(define build-deps '("rackunit-lib" "scribble-lib" "racket-doc"))
 
 (define scribblings '(("scribblings/quad-fp.scrbl" ())))
 

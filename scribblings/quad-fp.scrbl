@@ -144,13 +144,11 @@ present. See the package README for details.}
   @defproc[(qfmax [a Quad?] [b Quad?]) Quad?]
   @defproc[(qfmin [a Quad?] [b Quad?]) Quad?]
   @defproc[(qfnextafter [a Quad?] [b Quad?]) Quad?]
-  @defproc[(qflogb [a Quad?]) Quad?]
   @defproc[(qffma [a Quad?] [b Quad?] [c Quad?]) Quad?]
 )]{
   Floating-point remainder, IEEE remainder, sign copying, positive difference,
-  maximum, minimum, next representable value toward @racket[b], unbiased
-  exponent, and the fused multiply-add @racket[(qf+ (qf* a b) c)] computed with
-  a single rounding.}
+  maximum, minimum, next representable value toward @racket[b], and the fused
+  multiply-add @racket[(qf+ (qf* a b) c)] computed with a single rounding.}
 
 @section{Comparison}
 
@@ -170,9 +168,8 @@ present. See the package README for details.}
   @defproc[(qfinfinite? [a Quad?]) boolean?]
   @defproc[(qffinite? [a Quad?]) boolean?]
   @defproc[(qfsignbit? [a Quad?]) boolean?]
-  @defproc[(qfsignaling? [a Quad?]) boolean?]
 )]{
-  Test for NaN, infinity, finiteness, a set sign bit, and signaling NaN.}
+  Test for NaN, infinity, finiteness, and a set sign bit.}
 
 @section{Constants}
 

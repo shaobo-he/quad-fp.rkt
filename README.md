@@ -75,9 +75,9 @@ The API mirrors libquadmath's real-valued surface:
 - **Rounding** — `qfceil qffloor qftrunc qfround qfrint qfnearbyint qfabs`
 - **Special** — `qferf qferfc qflgamma qftgamma`, Bessel `qfj0 qfj1 qfy0 qfy1`
 - **Misc binary** — `qffmod qfremainder qfcopysign qffdim qfmax qfmin
-  qfnextafter qflogb` and the fused multiply-add `qffma`
+  qfnextafter` and the fused multiply-add `qffma`
 - **Comparison** — `qf= qf< qf<= qf> qf>=`
-- **Classification** — `qfnan? qfinfinite? qffinite? qfsignbit? qfsignaling?`
+- **Classification** — `qfnan? qfinfinite? qffinite? qfsignbit?`
 - **Conversion** — `double-flonum->quad-flonum` / `quad-flonum->double-flonum`,
   full-precision `string->quad-flonum` / `quad-flonum->string`, and (typed
   module) `quad-flonum->bytes`
@@ -86,7 +86,9 @@ The API mirrors libquadmath's real-valued surface:
 
 See the [Scribble docs](scribblings/quad-fp.scrbl) for the full list. Complex
 (`__complex128`) functions and the multi-result functions (`frexpq`, `sincosq`,
-…) are not yet bound.
+…) are not yet bound. `qfexp2` is implemented via `powq`, and `logbq` /
+`issignalingq` are intentionally omitted, since those symbols are absent from
+some older libquadmath builds (binding them made `libquadf` fail to load).
 
 ## License
 

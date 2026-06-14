@@ -37,6 +37,7 @@
     (check-equal? (df (qflog (qf 1.0))) 0.0 "log 1")
     (check-equal? (df (qflog2 (qf 8.0))) 3.0 "log2 8")
     (check-equal? (df (qflog10 (qf 1000.0))) 3.0 "log10 1000")
+    (check-equal? (df (qfexp2 (qf 10.0))) 1024.0 "exp2 10 (via powq)")
     (check-equal? (df (qferf (qf 0.0))) 0.0 "erf 0")
     (check-equal? (df (qferfc (qf 0.0))) 1.0 "erfc 0")
     (check-equal? (df (qftgamma (qf 5.0))) 24.0 "tgamma 5 = 4!")
