@@ -15,7 +15,8 @@ A toy [Racket](https://racket-lang.org) binding to GCC's
 | `quadf.rkt`                 | `racket/base` FFI bindings (untyped)                           |
 | `quadf-typed.rkt`           | Typed Racket wrapper exposing an opaque `Quad-Flonum` type      |
 | `main.rkt`                  | Package entry point — `(require quad-fp)`                       |
-| `quadf-test.rkt`            | `rackunit` test suite                                          |
+| `quadf-test.rkt`            | `rackunit` unit tests                                          |
+| `quadf-bigfloat-test.rkt`   | `rackcheck` property tests vs. `math/bigfloat` at 113-bit      |
 | `info.rkt`                  | Package metadata, dependencies, and the install hook           |
 | `private/build-native.rkt`  | Compiles `libquadf` from source at install time                |
 | `scribblings/quad-fp.scrbl` | API documentation                                              |
@@ -44,8 +45,14 @@ For development, the `Makefile` builds the shim directly:
 
 ```sh
 make        # builds libquadf.so (libquadf.dylib on macOS)
-make test   # builds, then runs the rackunit suite
+make test   # builds, then runs the unit + property suites
 ```
+
+The property suite (`quadf-bigfloat-test.rkt`) checks the operations against
+[`math/bigfloat`](https://docs.racket-lang.org/math/bigfloat.html) at 113-bit
+precision (the binary128 significand): `+ - * /`, `sqrt`, and `fma` must match
+bigfloat *bit for bit* (they're correctly rounded), and the transcendentals are
+held to within 64 ULP (measured < 1).
 
 The modules locate `libquadf` relative to their own source via
 `define-runtime-path`, so once it's built (next to the `.rkt` files, as `make`
