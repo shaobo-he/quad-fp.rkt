@@ -71,13 +71,11 @@ UNARY(asinhQ, asinhq(qa))
 UNARY(acoshQ, acoshq(qa))
 UNARY(atanhQ, atanhq(qa))
 UNARY(expQ, expq(qa))
-UNARY(exp2Q, exp2q(qa))
 UNARY(expm1Q, expm1q(qa))
 UNARY(logQ, logq(qa))
 UNARY(log2Q, log2q(qa))
 UNARY(log10Q, log10q(qa))
 UNARY(log1pQ, log1pq(qa))
-UNARY(logbQ, logbq(qa))
 UNARY(ceilQ, ceilq(qa))
 UNARY(floorQ, floorq(qa))
 UNARY(truncQ, truncq(qa))
@@ -92,6 +90,15 @@ UNARY(j0Q, j0q(qa))
 UNARY(j1Q, j1q(qa))
 UNARY(y0Q, y0q(qa))
 UNARY(y1Q, y1q(qa))
+
+// exp2(x) = 2^x, via powq. (exp2q is absent from some libquadmath versions,
+// so we avoid the symbol to keep libquadf loadable everywhere.)
+void exp2Q(_qf* a, _qf* r) {
+  __float128 qa; memcpy(&qa, a, sizeof(qa));
+  __float128 two = 2;
+  __float128 qr = powq(two, qa);
+  memcpy(r, &qr, sizeof(qr));
+}
 
 // --- binary math (libquadmath) --------------------------------------------
 BINARY(powQ, powq(qa, qb))
@@ -126,7 +133,6 @@ UPRED(isnanQ, isnanq(qa))
 UPRED(isinfQ, isinfq(qa))
 UPRED(finiteQ, finiteq(qa))
 UPRED(signbitQ, signbitq(qa))
-UPRED(issignalingQ, issignalingq(qa))
 
 // --- conversions: double <-> quad -----------------------------------------
 void df2qf(double d, _qf* r) {

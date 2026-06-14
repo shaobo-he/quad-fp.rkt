@@ -39,7 +39,6 @@
          qflog2
          qflog10
          qflog1p
-         qflogb
          qfceil
          qffloor
          qftrunc
@@ -77,7 +76,6 @@
          qfinfinite?
          qffinite?
          qfsignbit?
-         qfsignaling?
          ;; conversions
          double-flonum->quad-flonum
          quad-flonum->double-flonum
@@ -177,7 +175,6 @@
 (define-quad-unary qflog2 #:c-id log2Q)
 (define-quad-unary qflog10 #:c-id log10Q)
 (define-quad-unary qflog1p #:c-id log1pQ)
-(define-quad-unary qflogb #:c-id logbQ)
 (define-quad-unary qfceil #:c-id ceilQ)
 (define-quad-unary qffloor #:c-id floorQ)
 (define-quad-unary qftrunc #:c-id truncQ)
@@ -218,7 +215,6 @@
 (define-quad-predicate qfinfinite? #:c-id isinfQ)
 (define-quad-predicate qffinite? #:c-id finiteQ)
 (define-quad-predicate qfsignbit? #:c-id signbitQ)
-(define-quad-predicate qfsignaling? #:c-id issignalingQ)
 
 ;; --- conversions ----------------------------------------------------------
 (define-quad double-flonum->quad-flonum

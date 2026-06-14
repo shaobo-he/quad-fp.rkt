@@ -30,7 +30,6 @@
                        [qflog2 (Quad-Flonum -> Quad-Flonum)]
                        [qflog10 (Quad-Flonum -> Quad-Flonum)]
                        [qflog1p (Quad-Flonum -> Quad-Flonum)]
-                       [qflogb (Quad-Flonum -> Quad-Flonum)]
                        [qfceil (Quad-Flonum -> Quad-Flonum)]
                        [qffloor (Quad-Flonum -> Quad-Flonum)]
                        [qftrunc (Quad-Flonum -> Quad-Flonum)]
@@ -68,7 +67,6 @@
                        [qfinfinite? (Quad-Flonum -> Boolean)]
                        [qffinite? (Quad-Flonum -> Boolean)]
                        [qfsignbit? (Quad-Flonum -> Boolean)]
-                       [qfsignaling? (Quad-Flonum -> Boolean)]
                        ;; conversions
                        [double-flonum->quad-flonum (Float -> Quad-Flonum)]
                        [quad-flonum->double-flonum (Quad-Flonum -> Float)]

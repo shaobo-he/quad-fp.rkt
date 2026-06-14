@@ -15,7 +15,8 @@ A toy [Racket](https://racket-lang.org) binding to GCC's
 | `quadf.rkt`                 | `racket/base` FFI bindings (untyped)                           |
 | `quadf-typed.rkt`           | Typed Racket wrapper exposing an opaque `Quad-Flonum` type      |
 | `main.rkt`                  | Package entry point — `(require quad-fp)`                       |
-| `quadf-test.rkt`            | `rackunit` test suite                                          |
+| `quadf-test.rkt`            | `rackunit` unit tests                                          |
+| `quadf-bigfloat-test.rkt`   | `rackcheck` property tests vs. `math/bigfloat` at 113-bit      |
 | `info.rkt`                  | Package metadata, dependencies, and the install hook           |
 | `private/build-native.rkt`  | Compiles `libquadf` from source at install time                |
 | `scribblings/quad-fp.scrbl` | API documentation                                              |
@@ -44,8 +45,14 @@ For development, the `Makefile` builds the shim directly:
 
 ```sh
 make        # builds libquadf.so (libquadf.dylib on macOS)
-make test   # builds, then runs the rackunit suite
+make test   # builds, then runs the unit + property suites
 ```
+
+The property suite (`quadf-bigfloat-test.rkt`) checks the operations against
+[`math/bigfloat`](https://docs.racket-lang.org/math/bigfloat.html) at 113-bit
+precision (the binary128 significand): `+ - * /`, `sqrt`, and `fma` must match
+bigfloat *bit for bit* (they're correctly rounded), and the transcendentals are
+held to within 64 ULP (measured < 1).
 
 The modules locate `libquadf` relative to their own source via
 `define-runtime-path`, so once it's built (next to the `.rkt` files, as `make`
@@ -75,9 +82,9 @@ The API mirrors libquadmath's real-valued surface:
 - **Rounding** — `qfceil qffloor qftrunc qfround qfrint qfnearbyint qfabs`
 - **Special** — `qferf qferfc qflgamma qftgamma`, Bessel `qfj0 qfj1 qfy0 qfy1`
 - **Misc binary** — `qffmod qfremainder qfcopysign qffdim qfmax qfmin
-  qfnextafter qflogb` and the fused multiply-add `qffma`
+  qfnextafter` and the fused multiply-add `qffma`
 - **Comparison** — `qf= qf< qf<= qf> qf>=`
-- **Classification** — `qfnan? qfinfinite? qffinite? qfsignbit? qfsignaling?`
+- **Classification** — `qfnan? qfinfinite? qffinite? qfsignbit?`
 - **Conversion** — `double-flonum->quad-flonum` / `quad-flonum->double-flonum`,
   full-precision `string->quad-flonum` / `quad-flonum->string`, and (typed
   module) `quad-flonum->bytes`
@@ -86,7 +93,9 @@ The API mirrors libquadmath's real-valued surface:
 
 See the [Scribble docs](scribblings/quad-fp.scrbl) for the full list. Complex
 (`__complex128`) functions and the multi-result functions (`frexpq`, `sincosq`,
-…) are not yet bound.
+…) are not yet bound. `qfexp2` is implemented via `powq`, and `logbq` /
+`issignalingq` are intentionally omitted, since those symbols are absent from
+some older libquadmath builds (binding them made `libquadf` fail to load).
 
 ## License
 
