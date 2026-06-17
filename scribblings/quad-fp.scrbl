@@ -62,6 +62,49 @@ at 113-bit precision, characterize it as follows:
 A quad result may therefore differ in its last bit or two from one produced by
 another correctly-rounded library.
 
+@section[#:tag "performance"]{Performance}
+
+Every operation crosses the Racket/C boundary and allocates its result — a fixed
+overhead of roughly 40–70 nanoseconds per call on x86-64, independent of the
+operation. The relative cost therefore depends on how much work the operation
+itself does. Arithmetic and @racket[qfabs] are cheap in libquadmath (around
+10 ns), so the boundary dominates: expect about 4–6× the cost of the same
+operation in C. @racket[qfsqrt] and every transcendental or special function
+take hundreds to thousands of nanoseconds, leaving the boundary in the noise —
+within roughly 15%, and under 5% for the dearest ones such as @racket[qferf],
+@racket[qfpow], and @racket[qftgamma].
+
+The pattern, measured on one x86-64 machine (@tt{gcc -O3}, approximate ns per
+call):
+
+@tabular[
+  #:style 'boxed
+  #:sep @hspace[2]
+  #:row-properties '(bottom-border ())
+  #:column-properties '(left right right right)
+  (list (list @bold{operation} @bold{raw C} @bold{quad-fp/quadf} @bold{ratio})
+        (list @racket[qfabs]    "7"    "38"   "5.5×")
+        (list @racket[qf+]      "13"   "59"   "4.6×")
+        (list @racket[qf*]      "14"   "65"   "4.6×")
+        (list @racket[qf/]      "15"   "66"   "4.3×")
+        (list @racket[qfsqrt]   "308"  "350"  "1.14×")
+        (list @racket[qfsin]    "443"  "487"  "1.10×")
+        (list @racket[qffma]    "469"  "540"  "1.15×")
+        (list @racket[qfexp]    "549"  "591"  "1.08×")
+        (list @racket[qferf]    "1212" "1256" "1.04×")
+        (list @racket[qftgamma] "2837" "2899" "1.02×"))]
+
+Absolute numbers are machine-dependent; the ratios are the portable part.
+
+Those figures are for the untyped layer, @racketmodfont{quad-fp/quadf}. The
+default @racketmodname[quad-fp] additionally wraps each export in the Typed
+Racket @tt{require/typed} contract — another flat ~45 ns per call, a
+@racket[Quad?] check on every argument and result. That roughly doubles the
+cheap arithmetic operations but is negligible for the expensive ones, and it
+applies to typed and untyped callers alike. Code that is bottlenecked on quad
+arithmetic and does not need the static types can
+@racket[(require quad-fp/quadf)] to bypass it.
+
 @section{Datatype}
 
 @defidform[#:kind "type" Quad-Flonum]{
