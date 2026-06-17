@@ -14,7 +14,21 @@ point — roughly 34 significant decimal digits, versus the ~16 of Racket's
 native double @tech[#:doc '(lib "scribblings/reference/reference.scrbl")]{flonums}.
 
 Values are opaque: a quad is shuttled across the FFI boundary as 128 bits and
-is only ever produced or consumed by the operations below.
+is only ever produced or consumed by the operations below. The @tt{qf…}
+operations mirror libquadmath's @tt{…q} C functions — @racket[qfsqrt] wraps
+@tt{sqrtq}, @racket[qffma] wraps @tt{fmaq}, and so on — so libquadmath's own
+documentation maps directly onto this API.
+
+@racketblock[
+  (require quad-fp)
+  (define a (double-flonum->quad-flonum 1.0))
+  (define b (double-flonum->quad-flonum 1e-20))
+  (code:comment "In double, 1.0 + 1e-20 == 1.0; in quad the addend survives:")
+  (qf= (qf+ a b) a)
+  (code:comment "=> #f")
+  (quad-flonum->string (qf* quad-pi quad-pi))
+  (code:comment "=> \"9.86960440108935861883449099987615081\"")
+]
 
 @margin-note{The binding loads a native shared library (@tt{libquadf}) that is
 compiled from source at install time, so a C toolchain with libquadmath must be
@@ -48,11 +62,21 @@ at 113-bit precision, characterize it as follows:
 A quad result may therefore differ in its last bit or two from one produced by
 another correctly-rounded library.
 
-@section{Predicate}
+@section{Datatype}
+
+@defidform[#:kind "type" Quad-Flonum]{
+  The type of quadruple-precision values. This package is implemented in Typed
+  Racket, so in typed code every operation here consumes and produces
+  @racket[Quad-Flonum]s. The type is opaque — a value is created only by a
+  conversion (such as @racket[double-flonum->quad-flonum] or
+  @racket[string->quad-flonum]) or a named constant, never written as a literal.
+  The module is equally usable from untyped Racket, where @racket[Quad-Flonum]
+  does not appear and the predicate @racket[Quad?] takes its place.}
 
 @defproc[(Quad? [v any/c]) boolean?]{
-  Returns @racket[#t] if @racket[v] is a quad-precision value produced by this
-  library, @racket[#f] otherwise.}
+  Returns @racket[#t] if @racket[v] is a @racket[Quad-Flonum] produced by this
+  library, @racket[#f] otherwise — @racket[Quad-Flonum]'s runtime counterpart,
+  and the predicate the procedure signatures below are written against.}
 
 @section{Conversion}
 
@@ -73,8 +97,9 @@ another correctly-rounded library.
   exactly.}
 
 @defproc[(quad-flonum->bytes [q Quad?]) bytes?]{
-  Returns the 16-byte little-endian representation of @racket[q]'s
-  @tt{__float128} bit pattern.}
+  Returns the 16 bytes of @racket[q]'s @tt{__float128} bit pattern, low 64-bit
+  half first and each half in the platform's native byte order — i.e. the
+  value's little-endian byte string on x86-64.}
 
 @section{Arithmetic}
 
@@ -241,15 +266,3 @@ another correctly-rounded library.
   Format characteristics: mantissa bits (113), round-trippable decimal digits
   (33), and the binary and decimal exponent ranges.}
 
-@section{Example}
-
-@racketblock[
-  (require quad-fp)
-  (define a (double-flonum->quad-flonum 1.0))
-  (define b (double-flonum->quad-flonum 1e-20))
-  (code:comment "In double, 1.0 + 1e-20 == 1.0; in quad the addend survives:")
-  (qf= (qf+ a b) a)
-  (code:comment "=> #f")
-  (quad-flonum->string (qf* quad-pi quad-pi))
-  (code:comment "=> \"9.86960440108935861883449099987615081\"")
-]
