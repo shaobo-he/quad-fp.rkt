@@ -99,8 +99,9 @@
   (test-case "constants"
     (check-equal? quad-mant-dig 113 "binary128 mantissa bits")
     (check-equal? quad-decimal-dig 33 "round-trippable decimal digits")
-    ;; sqrt is correctly rounded, so the parsed constant is bit-exact.
-    (check-true (qf= quad-sqrt2 (qfsqrt (qf 2.0))) "sqrt2 constant")
+    ;; sqrt is correctly rounded on recent libquadmath, faithfully rounded on
+    ;; older builds — so compare the parsed constant to within a few ULP.
+    (check-true (qclose? quad-sqrt2 (qfsqrt (qf 2.0))) "sqrt2 constant")
     (check-true (qclose? quad-pi (qf* (qf 4.0) (qfatan (qf 1.0)))) "pi ≈ 4·atan(1)")
     (check-true (qclose? quad-e (qfexp (qf 1.0))) "e ≈ exp(1)")
     (check-true (qffinite? quad-max) "FLT128_MAX is finite")

@@ -50,9 +50,11 @@ make test   # builds, then runs the unit + property suites
 
 The property suite (`quadf-bigfloat-test.rkt`) checks the operations against
 [`math/bigfloat`](https://docs.racket-lang.org/math/bigfloat.html) at 113-bit
-precision (the binary128 significand): `+ - * /`, `sqrt`, and `fma` must match
-bigfloat *bit for bit* (they're correctly rounded), and the transcendentals are
-held to within 64 ULP (measured < 1).
+precision (the binary128 significand): `+ - * /` match bigfloat *bit for bit*
+(they're correctly rounded on every libquadmath); `sqrt` and `fma` are bit-exact
+on recent libquadmath and within a few ULP on older builds; and the
+transcendentals are held to a loose ULP bound (the gamma functions loosest, as
+their accuracy varies most across libquadmath versions).
 
 The modules locate `libquadf` relative to their own source via
 `define-runtime-path`, so once it's built (next to the `.rkt` files, as `make`
