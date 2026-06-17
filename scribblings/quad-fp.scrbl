@@ -20,6 +20,34 @@ is only ever produced or consumed by the operations below.
 compiled from source at install time, so a C toolchain with libquadmath must be
 present. See the package README for details.}
 
+@section[#:tag "accuracy"]{Accuracy}
+
+Every result comes straight from libquadmath, so the accuracy is libquadmath's
+and varies slightly across GCC versions. The package's property tests, which
+check each operation against
+@hyperlink["https://docs.racket-lang.org/math/bigfloat.html"]{@tt{math/bigfloat}}
+at 113-bit precision, characterize it as follows:
+
+@itemlist[
+  @item{@racket[qf+], @racket[qf-], @racket[qf*], and @racket[qf/] are
+        @emph{correctly rounded} on every libquadmath: each result is the exact
+        value rounded to the nearest binary128, matching @tt{math/bigfloat} bit
+        for bit.}
+  @item{@racket[qfsqrt] and @racket[qffma] are correctly rounded on recent
+        libquadmath, but only @emph{faithfully rounded} (within one unit in the
+        last place) on older builds. There @tt{sqrtq} refines a @tt{double} seed
+        by Newton's method with no final correcting step, and @tt{fmaq} may
+        double-round by up to one ulp — while still computing a true,
+        cancellation-safe fused multiply-add.}
+  @item{The transcendental and special functions are not guaranteed correctly
+        rounded; in practice they are within a few ulps. The gamma functions
+        @racket[qftgamma] and @racket[qflgamma] are the least accurate and vary
+        the most from one libquadmath to the next.}
+]
+
+A quad result may therefore differ in its last bit or two from one produced by
+another correctly-rounded library.
+
 @section{Predicate}
 
 @defproc[(Quad? [v any/c]) boolean?]{
@@ -148,7 +176,8 @@ present. See the package README for details.}
 )]{
   Floating-point remainder, IEEE remainder, sign copying, positive difference,
   maximum, minimum, next representable value toward @racket[b], and the fused
-  multiply-add @racket[(qf+ (qf* a b) c)] computed with a single rounding.}
+  multiply-add @racket[(qf+ (qf* a b) c)], computed with a single rounding where
+  libquadmath provides it (see @secref["accuracy"]).}
 
 @section{Comparison}
 
