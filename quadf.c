@@ -4,7 +4,9 @@
 // boundary as an opaque 16-byte struct (_qf): we memcpy it into a real
 // __float128, compute, and memcpy the result back out.
 
-#ifndef _WIN32
+#if defined(__APPLE__)
+#define _DARWIN_C_SOURCE 1
+#elif !defined(_WIN32)
 #define _XOPEN_SOURCE 700
 #endif
 
@@ -16,6 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <quadmath.h>
+
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
 
 typedef struct {
   uint64_t fh;

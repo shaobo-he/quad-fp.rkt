@@ -17,6 +17,8 @@ A toy [Racket](https://racket-lang.org) binding to GCC's
 | `main.rkt`                  | Package entry point — `(require quad-fp)`                       |
 | `quadf-test.rkt`            | `rackunit` unit tests                                          |
 | `quadf-bigfloat-test.rkt`   | `rackcheck` property tests vs. `math/bigfloat` at 113-bit      |
+| `quadf-typed-client-test.rkt` | Compiled Typed Racket consumer of the public entry point        |
+| `benchmarks/quadf-bench.rkt` | Reproducible local performance benchmark                        |
 | `info.rkt`                  | Package metadata, dependencies, and the install hook           |
 | `private/build-native.rkt`  | Compiles `libquadf` from source at install time                |
 | `scribblings/quad-fp.scrbl` | API documentation                                              |
@@ -45,6 +47,10 @@ CC=gcc-15 raco pkg install --auto --name quad-fp
 Both build paths honor `CC`; `CPPFLAGS`, `CFLAGS`, and `PICFLAGS`;
 `LDFLAGS` and `SHARED_LDFLAGS`; and `LDLIBS` and `QUADMATH_LIBS`.
 
+Linux and macOS are exercised in CI. Windows/MinGW support is experimental:
+the DLL and thread-local locale paths are implemented, but not currently run
+in CI.
+
 ## Install
 
 As a Racket package (once published to the
@@ -65,12 +71,13 @@ For development, the `Makefile` builds the shim directly:
 ```sh
 make        # builds libquadf.so (libquadf.dylib on macOS)
 make test   # builds, then runs the unit + property suites
+make bench  # measures the untyped FFI layer on this machine
 ```
 
 `make test` assumes the Racket build/test dependencies declared in `info.rkt`
-(`rackcheck-lib`, `math-lib`, and `rackunit-lib`) are installed. From a fresh
-clone, bootstrap them by linking/installing the package once before invoking
-the Makefile:
+(`rackcheck-lib`, `math-lib`, `rackunit-lib`, and `typed-racket-more`) are
+installed. From a fresh clone, bootstrap them by linking/installing the package
+once before invoking the Makefile:
 
 ```sh
 raco pkg install --auto --name quad-fp
@@ -94,6 +101,24 @@ zero, the same numeric limits are absolute rather than relative. These are
 regression-test bounds, not guarantees made by libquadmath for every input or
 release.
 
+Property runs are reproducible and configurable. The defaults are 10,000 cases
+for general properties, one fifth as many for exponent-boundary properties,
+and seed 1337. CI uses additional seeds and smaller platform smoke runs:
+
+```sh
+RACKCHECK_TESTS=2000 RACKCHECK_SEED=42 make test
+```
+
+The generators include ordinary finite inputs plus dedicated subnormal,
+underflow, and near-overflow ranges. Together, the property and unit suites
+exercise every exported binding. Focused unit cases also cover NaNs, signed
+zero, infinities, exact binary encodings, and a cancellation vector that
+distinguishes fused multiply-add from multiply-then-add.
+
+Benchmark results depend on the Racket implementation, compiler, CPU, and
+libquadmath version. Run `make bench` for local numbers; increase stability with
+`QUADF_BENCH_ITERATIONS=500000 make bench`.
+
 The modules locate `libquadf` relative to their own source via
 `define-runtime-path`, so once it's built (next to the `.rkt` files, as `make`
 does) the binding works from any working directory.
@@ -111,6 +136,16 @@ does) the binding works from any working directory.
 (quad-flonum->string (qf+ a b))
 ;; => "1.00000000000000000000999999999999995"
 (qf= (qf+ a b) a)                        ; => #f
+```
+
+Typed Racket receives the opaque type through the same public entry point:
+
+```racket
+#lang typed/racket/base
+(require quad-fp)
+
+(: square (Quad-Flonum -> Quad-Flonum))
+(define (square x) (qf* x x))
 ```
 
 The API mirrors libquadmath's real-valued surface:
@@ -134,12 +169,20 @@ The API mirrors libquadmath's real-valued surface:
   decimal digits of precision), and `quad-decimal-dig` (36 digits for a
   binary128 decimal round trip)
 
-Decimal conversion is locale-independent and always uses `.` as the decimal
-separator. Apart from surrounding C-locale whitespace,
-`string->quad-flonum` requires the whole string to be a valid number instead
-of silently accepting a numeric prefix. `quad-flonum->string` accepts a
-precision from 1 through 12000 (default 36), sizes its output dynamically, and
-returns the complete representation without fixed-buffer truncation.
+Numeric conversion is locale-independent and always uses `.` as the decimal
+separator. `string->quad-flonum` accepts complete C `strtoflt128` syntax:
+decimal or hexadecimal floats, infinities, and NaNs, with optional surrounding
+C-locale whitespace. Malformed or partially consumed input raises a contract
+exception; syntactically valid overflow and underflow produce infinity and
+signed zero. `quad-flonum->string` accepts a precision from 1 through 12000
+(default 36), sizes its output dynamically, and returns the complete
+representation. The default round-trips every finite binary128 value; textual
+NaN formatting does not preserve payload or signalling state.
+
+Numerical domain errors follow IEEE/libquadmath behavior rather than raising
+Racket exceptions: invalid operations return NaN, division by zero returns
+signed infinity, and NaN is unordered in all comparisons. C `errno` and
+floating-point exception flags are not exposed.
 
 `qflgamma` ultimately calls libquadmath's `lgammaq`, which writes the
 process-global C variable `signgam`. It is not safe to run `qflgamma`

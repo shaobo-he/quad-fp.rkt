@@ -29,13 +29,19 @@ jobs:
           gcc --version | head -1
           racket --version
 
+      - name: Strict native diagnostics
+        run: >-
+          gcc -std=c11 -fsyntax-only
+          -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror
+          quadf.c
+
       # Use --copy so the install hook builds in the installed package rather
       # than leaving a library in this checkout that the Makefile would reuse.
       - name: Install a copied package (install-hook build)
         run: raco pkg install --copy --auto --type dir --name quad-fp "$GITHUB_WORKSPACE"
 
       - name: Test installed package
-        run: raco test --collection quad-fp
+        run: RACKCHECK_TESTS=2000 RACKCHECK_SEED=1337 raco test --collection quad-fp
 
       - name: Verify install did not build in the checkout
         run: test ! -e libquadf.so
@@ -45,7 +51,7 @@ jobs:
       - name: Build and test from the checkout (Makefile build)
         run: |
           make clean
-          make test
+          RACKCHECK_SEED=7331 make test
 
       - name: Test under a comma-decimal locale
         run: |
@@ -89,4 +95,7 @@ jobs:
           unset CC
           make clean
           make all
-          raco test quadf-test.rkt
+          raco test quadf-test.rkt quadf-typed-client-test.rkt private/build-native.rkt
+
+      - name: Reduced property suite on macOS
+        run: RACKCHECK_TESTS=500 RACKCHECK_SEED=2027 raco test quadf-bigfloat-test.rkt

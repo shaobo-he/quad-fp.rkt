@@ -154,3 +154,29 @@
     (error 'quad-fp
            "failed to compile ~a (set CC to GCC and ensure libquadmath is installed)"
            so-out)))
+
+(module+ test
+  (require rackunit)
+
+  (define windows? (eq? (system-type 'os) 'windows))
+
+  (check-equal? (split-build-arguments "CC" "ccache gcc -m64")
+                '("ccache" "gcc" "-m64"))
+  (check-equal? (split-build-arguments
+                 "CFLAGS"
+                 "\"-DNAME=quad fp\" 'literal $value'")
+                '("-DNAME=quad fp" "literal $value"))
+  (check-equal? (split-build-arguments "CFLAGS" "escaped\\ space")
+                (if windows? '("escaped\\" "space") '("escaped space"))
+                "Windows keeps path backslashes literal")
+  (check-equal? (split-build-arguments "CFLAGS" "'' \"\"")
+                '("" ""))
+  (check-equal? (split-build-arguments "CFLAGS" "; $()")
+                '(";" "$()")
+                "metacharacters remain inert arguments")
+  (check-exn #rx"unmatched quote"
+             (lambda () (split-build-arguments "CFLAGS" "'unterminated")))
+  (if windows?
+      (check-equal? (split-build-arguments "CFLAGS" "trailing\\") '("trailing\\"))
+      (check-exn #rx"incomplete escape"
+                 (lambda () (split-build-arguments "CFLAGS" "trailing\\")))))

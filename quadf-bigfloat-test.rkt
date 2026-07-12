@@ -20,12 +20,36 @@
            "quadf-typed.rkt")
 
   (bf-precision 113) ; binary128 significand width
-  (define cfg (make-config #:tests 10000 #:seed 1337))
+
+  (define (environment-integer name default minimum)
+    (define text (getenv name))
+    (define value (and text (string->number text)))
+    (cond
+      [(not text) default]
+      [(and (exact-integer? value) (>= value minimum)) value]
+      [else
+       (error 'quadf-bigfloat-test
+              "~a must be an exact integer >= ~a; received ~e"
+              name
+              minimum
+              text)]))
+
+  (define property-test-count (environment-integer "RACKCHECK_TESTS" 10000 1))
+  (define property-seed (environment-integer "RACKCHECK_SEED" 1337 0))
+  (define cfg (make-config #:tests property-test-count #:seed property-seed))
+  (define edge-cfg
+    (make-config #:tests (max 100 (quotient property-test-count 5)) #:seed (add1 property-seed)))
+  (printf "quad-fp property configuration: tests=~a seed=~a edge-tests=~a\n"
+          property-test-count
+          property-seed
+          (max 100 (quotient property-test-count 5)))
 
   ;; --- bridge: a quad and a bigfloat denoting the same binary128 value -----
   ;; quad -> bigfloat is exact: 36 significant digits round-trips binary128.
   (define (q->bf q)
     (bf (quad-flonum->string q)))
+  (define (bf->q b)
+    (string->quad-flonum (bigfloat->string b)))
   (define (bytes->nat bs)
     (for/fold ([n 0]) ([b (in-bytes bs)])
       (+ (* n 256) b)))
@@ -44,7 +68,10 @@
                (if (and (eq? sign 'both) neg)
                    (bf- mag)
                    mag))
-             (cons (string->quad-flonum (bigfloat->string b)) b)))
+             (define q (bf->q b))
+             ;; Anchor the reference to the parsed binary128 input. This keeps
+             ;; the pair identical even in the subnormal range.
+             (cons q (q->bf q))))
 
   ;; Generator of values spread linearly across [lo, hi] (bounded domains).
   (define (gen:val-in lo hi)
@@ -52,11 +79,100 @@
              (define len (max 1 (bytes-length bs)))
              (define frac (bf/ (bf (bytes->nat bs)) (2^ (* 8 len)))) ; [0,1)
              (define b (bf+ (bf lo) (bf* (bf- (bf hi) (bf lo)) frac)))
-             (cons (string->quad-flonum (bigfloat->string b)) b)))
+             (define q (bf->q b))
+             (cons q (q->bf q))))
 
   ;; --- comparison ----------------------------------------------------------
   (define (exact? q-result bf-result)
     (bf= (q->bf q-result) bf-result))
+
+  ;; Round an exact rational to an IEEE 754 binary128 object representation.
+  ;; Using integers here avoids a second MPFR or decimal rounding at the
+  ;; subnormal and overflow boundaries that these tests are meant to probe.
+  (define binary128-fraction-bits 112)
+  (define binary128-bias 16383)
+  (define binary128-min-exponent -16382)
+  (define binary128-max-exponent 16383)
+  (define binary128-min-subnormal-exponent -16494)
+  (define binary128-significand-limit (expt 2 binary128-fraction-bits))
+  (define binary128-infinity-bits (arithmetic-shift #x7fff binary128-fraction-bits))
+  (define binary128-sign-bit (arithmetic-shift 1 127))
+  (define binary128-low-word-mask (sub1 (expt 2 64)))
+
+  (define (round-rational-to-even x)
+    (define-values (integer-part remainder)
+      (quotient/remainder (numerator x) (denominator x)))
+    (define doubled-remainder (* 2 remainder))
+    (cond
+      [(< doubled-remainder (denominator x)) integer-part]
+      [(> doubled-remainder (denominator x)) (add1 integer-part)]
+      [(even? integer-part) integer-part]
+      [else (add1 integer-part)]))
+
+  (define (floor-log2-rational x)
+    (define tentative
+      (- (integer-length (numerator x)) (integer-length (denominator x))))
+    (if (>= x (expt 2 tentative)) tentative (sub1 tentative)))
+
+  (define (rational->binary128-bits x)
+    (define negative-value? (negative? x))
+    (define magnitude (abs x))
+    (define sign-bits (if negative-value? binary128-sign-bit 0))
+    (define magnitude-bits
+      (cond
+        [(zero? magnitude) 0]
+        [else
+         (define exponent (floor-log2-rational magnitude))
+         (cond
+           [(< exponent binary128-min-exponent)
+            ;; Subnormals use a fixed 2^-16494 quantum. A rounded significand
+            ;; of 2^112 is exactly the minimum normal encoding.
+            (round-rational-to-even
+             (* magnitude (expt 2 (- binary128-min-subnormal-exponent))))]
+           [(> exponent binary128-max-exponent) binary128-infinity-bits]
+           [else
+            (define significand
+              (round-rational-to-even
+               (* magnitude (expt 2 (- binary128-fraction-bits exponent)))))
+            (define carry? (= significand (* 2 binary128-significand-limit)))
+            (define rounded-exponent (if carry? (add1 exponent) exponent))
+            (define rounded-significand
+              (if carry? binary128-significand-limit significand))
+            (if (> rounded-exponent binary128-max-exponent)
+                binary128-infinity-bits
+                (+ (arithmetic-shift (+ rounded-exponent binary128-bias)
+                                     binary128-fraction-bits)
+                   (- rounded-significand binary128-significand-limit)))])]))
+    (bitwise-ior sign-bits magnitude-bits))
+
+  (define (exact-binary128? q-result rational-result)
+    (define bits (rational->binary128-bits rational-result))
+    (define low-bytes
+      (integer->integer-bytes
+       (bitwise-and bits binary128-low-word-mask) 8 #f (system-big-endian?)))
+    (define high-bytes
+      (integer->integer-bytes (arithmetic-shift bits -64) 8 #f (system-big-endian?)))
+    (define expected
+      (if (system-big-endian?)
+          (bytes-append high-bytes low-bytes)
+          (bytes-append low-bytes high-bytes)))
+    (bytes=? (quad-flonum->bytes q-result) expected))
+
+  (test-case "exact-rational binary128 oracle"
+    (check-equal? (rational->binary128-bits 0) 0)
+    (check-equal? (rational->binary128-bits 1)
+                  (arithmetic-shift #x3fff binary128-fraction-bits))
+    (check-equal? (rational->binary128-bits (expt 2 binary128-min-subnormal-exponent)) 1)
+    (check-equal? (rational->binary128-bits (expt 2 (sub1 binary128-min-subnormal-exponent)))
+                  0
+                  "half the minimum subnormal ties to even zero")
+    (define max-finite
+      (* (sub1 (* 2 binary128-significand-limit)) (expt 2 16271)))
+    (check-equal? (rational->binary128-bits max-finite)
+                  (sub1 binary128-infinity-bits))
+    (check-equal? (rational->binary128-bits (+ max-finite (expt 2 16270)))
+                  binary128-infinity-bits
+                  "the overflow midpoint rounds to infinity"))
 
   ;; Relative tolerances. Across a normalized binary128 binade, one ULP ranges
   ;; from 2^-112 to just over 2^-113 of the value, so a fixed relative bound
@@ -107,6 +223,35 @@
                               (approx? (qfsqrt (car a)) (bfsqrt (cdr a)) TOL-RND))))
   (test-case "qfabs = bfabs"
     (check-property cfg (property ([a (gen:val)]) (exact? (qfabs (car a)) (bfabs (cdr a))))))
+
+  ;; Exercise the exponent boundaries that the ordinary [-100, 100] generator
+  ;; intentionally avoids. Exact rational arithmetic supplies an independent
+  ;; oracle for binary128's gradual underflow and overflow rounding.
+  (define gen:tiny (gen:val #:emin -16494 #:emax -16380))
+  (define gen:huge (gen:val #:emin 16300 #:emax 16382))
+  (define boundary-regions
+    (list (list "at the subnormal boundary" gen:tiny)
+          (list "near overflow" gen:huge)))
+  (define exact-arithmetic-operations
+    (list (list "+" qf+ +)
+          (list "-" qf- -)
+          (list "*" qf* *)
+          (list "/" qf/ /)))
+  (for* ([region (in-list boundary-regions)]
+         [operation (in-list exact-arithmetic-operations)])
+    (define region-name (car region))
+    (define generator (cadr region))
+    (define operation-name (car operation))
+    (define quad-operation (cadr operation))
+    (define rational-operation (caddr operation))
+    (test-case (format "qf~a agrees ~a" operation-name region-name)
+      (check-property
+       edge-cfg
+       (property ([a generator] [b generator])
+         (exact-binary128?
+          (quad-operation (car a) (car b))
+          (rational-operation (bigfloat->rational (cdr a))
+                              (bigfloat->rational (cdr b))))))))
   (test-case "qffma ~ round(a*b+c) with relative error <= 2^-110"
     (check-property cfg
                     (property ([a (gen:val #:emin -40 #:emax 40)] [b (gen:val #:emin -40 #:emax 40)]

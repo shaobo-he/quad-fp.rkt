@@ -10,11 +10,13 @@
 ;; Runtime: typed-racket-lib backs quadf-typed.rkt.
 (define deps '("base" "typed-racket-lib"))
 
-;; Build/test only: tests (rackunit, plus rackcheck-lib + math-lib for the
-;; property tests that check ops against bigfloat), and docs (racket-doc
+;; Build/test only: tests (rackunit, typed-racket-more for typed/rackunit, plus
+;; rackcheck-lib + math-lib for the property tests that check ops against
+;; bigfloat), and docs (racket-doc
 ;; supplies the cross-reference targets the Scribble doc links to, e.g.
 ;; `require` and `flonum?`).
 (define build-deps '("rackunit-lib"
+                     "typed-racket-more"
                      "rackcheck-lib"
                      "math-lib"
                      "scribble-lib"

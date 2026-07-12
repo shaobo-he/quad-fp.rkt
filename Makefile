@@ -53,8 +53,9 @@ endif
 
 SHARED_LIB := libquadf.$(SHLIB_EXT)
 SRC_FILE := quadf.c
+TEST_FILES := quadf-test.rkt quadf-bigfloat-test.rkt quadf-typed-client-test.rkt private/build-native.rkt
 
-.PHONY: all test clean
+.PHONY: all test bench clean
 .DELETE_ON_ERROR:
 
 all: $(SHARED_LIB)
@@ -63,8 +64,11 @@ $(SHARED_LIB): $(SRC_FILE) Makefile
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(PICFLAGS) $(LDFLAGS) $(SHARED_LDFLAGS) -o $@ $< $(LDLIBS) $(QUADMATH_LIBS)
 
 test: all
-	raco test quadf-test.rkt quadf-bigfloat-test.rkt
+	raco test $(TEST_FILES)
+
+bench: all
+	racket benchmarks/quadf-bench.rkt
 
 clean:
 	rm -f *.so *.o *.dylib *.dll
-	rm -rf compiled private/compiled scribblings/compiled doc
+	rm -rf compiled private/compiled scribblings/compiled benchmarks/compiled doc

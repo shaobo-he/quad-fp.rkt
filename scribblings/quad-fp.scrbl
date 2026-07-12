@@ -1,7 +1,10 @@
 #lang scribble/manual
-@(require (for-label racket/base
+@(require scribble/example
+          (for-label racket/base
                      racket/contract
                      quad-fp))
+
+@(define quad-eval (make-base-eval))
 
 @title{quad-fp: quadruple-precision floating point}
 @author{Shaobo He}
@@ -20,16 +23,14 @@ operations mirror libquadmath's @tt{…q} C functions — @racket[qfsqrt] wraps
 @tt{sqrtq}, @racket[qffma] wraps @tt{fmaq}, and so on — so libquadmath's own
 documentation maps directly onto this API.
 
-@racketblock[
+@examples[#:eval quad-eval
   (require quad-fp)
   (define a (double-flonum->quad-flonum 1.0))
   (define b (double-flonum->quad-flonum 1e-20))
-  (code:comment "In double, 1.0 + 1e-20 == 1.0; in quad the addend survives:")
   (qf= (qf+ a b) a)
-  (code:comment "=> #f")
   (quad-flonum->string (qf* quad-pi quad-pi))
-  (code:comment "=> \"9.86960440108935861883449099987615081\"")
 ]
+@(close-eval quad-eval)
 
 @margin-note{The binding loads a native shared library (@tt{libquadf}) that is
 compiled from source at install time, so a C toolchain with libquadmath must be
@@ -37,9 +38,12 @@ present. See the package README for details.}
 
 @section[#:tag "accuracy"]{Accuracy}
 
-Every result comes straight from libquadmath, so the accuracy is libquadmath's
-and varies across GCC versions. The package's property tests compare the core
-operations and functions for which there is a corresponding
+The arithmetic operators are compiled as GCC @tt{__float128} operations; the
+elementary and special functions delegate to libquadmath. The exception is
+@racket[qfexp2], which uses @tt{powq(2,x)} for compatibility with libquadmath
+versions that do not export @tt{exp2q}. Accuracy therefore varies across GCC
+versions. The package's property tests compare the core operations and
+functions for which there is a corresponding
 @hyperlink["https://docs.racket-lang.org/math/bigfloat.html"]{@tt{math/bigfloat}}
 operation at 113-bit precision. Their regression bounds are:
 
@@ -68,53 +72,33 @@ libquadmath versions, especially for @racket[qftgamma].
 
 @section[#:tag "performance"]{Performance}
 
-Every operation crosses the Racket/C boundary and allocates its result — a fixed
-overhead of roughly 40–70 nanoseconds per call on x86-64, independent of the
-operation. The relative cost therefore depends on how much work the operation
-itself does. Arithmetic and @racket[qfabs] are cheap in libquadmath (around
-10 ns), so the boundary dominates: expect about 4–6× the cost of the same
-operation in C. @racket[qfsqrt] and every transcendental or special function
-take hundreds to thousands of nanoseconds, leaving the boundary in the noise —
-within roughly 15%, and under 5% for the dearest ones such as @racket[qferf],
-@racket[qfpow], and @racket[qftgamma].
+Every operation crosses the Racket/C boundary and allocates a result. That fixed
+cost is most visible for arithmetic and much less important for expensive
+transcendental functions. Exact timings depend on the Racket implementation,
+compiler, CPU, and libquadmath version, so measure on the deployment system:
 
-The pattern, measured on one x86-64 machine (@tt{gcc -O3}, approximate ns per
-call):
+@verbatim|{
+make bench
+QUADF_BENCH_ITERATIONS=500000 make bench
+}|
 
-@tabular[
-  #:style 'boxed
-  #:sep @hspace[2]
-  #:row-properties '(bottom-border ())
-  #:column-properties '(left right right right)
-  (list (list @bold{operation} @bold{raw C} @bold{quad-fp/quadf} @bold{ratio})
-        (list @racket[qfabs]    "7"    "38"   "5.5×")
-        (list @racket[qf+]      "13"   "59"   "4.6×")
-        (list @racket[qf*]      "14"   "65"   "4.6×")
-        (list @racket[qf/]      "15"   "66"   "4.3×")
-        (list @racket[qfsqrt]   "308"  "350"  "1.14×")
-        (list @racket[qfsin]    "443"  "487"  "1.10×")
-        (list @racket[qffma]    "469"  "540"  "1.15×")
-        (list @racket[qfexp]    "549"  "591"  "1.08×")
-        (list @racket[qferf]    "1212" "1256" "1.04×")
-        (list @racket[qftgamma] "2837" "2899" "1.02×"))]
+The benchmark reports nanoseconds per call, the Racket version, machine type,
+and iteration count. It measures the untyped @racketmodfont{quad-fp/quadf}
+layer. The default @racketmodname[quad-fp] adds Typed Racket contracts at the
+boundary.
 
-Absolute numbers are machine-dependent; the ratios are the portable part.
-
-Those figures are for the untyped layer, @racketmodfont{quad-fp/quadf}. The
-default @racketmodname[quad-fp] additionally wraps each export in the Typed
-Racket @tt{require/typed} contract — another flat ~45 ns per call, a
-@racket[Quad?] check on every argument and result. That roughly doubles the
-cheap arithmetic operations but is negligible for the expensive ones, and it
-applies to typed and untyped callers alike. Code that is bottlenecked on quad
-arithmetic and does not need the static types can
-@racket[(require quad-fp/quadf)] to bypass it.
+The untyped module uses @racketmodfont{ffi/unsafe}, bypasses the public typed
+contracts, and exposes low-level representation accessors. Treat it as an
+optimization interface: use it only after profiling, pass values produced by
+this package, and do not depend on its extra exports remaining stable.
 
 @section{Datatype}
 
 @defidform[#:kind "type" Quad-Flonum]{
-  The type of quadruple-precision values. This package is implemented in Typed
-  Racket, so in typed code every operation here consumes and produces
-  @racket[Quad-Flonum]s. The type is opaque — a value is created only by a
+  The type of quadruple-precision values. The public module is a Typed Racket
+  facade over the untyped FFI core, so in typed code every operation here
+  consumes and produces @racket[Quad-Flonum]s. The type is opaque — a value is
+  created only by a
   conversion (such as @racket[double-flonum->quad-flonum] or
   @racket[string->quad-flonum]) or a named constant, never written as a literal.
   The module is equally usable from untyped Racket, where @racket[Quad-Flonum]
@@ -124,6 +108,19 @@ arithmetic and does not need the static types can
   Returns @racket[#t] if @racket[v] is a @racket[Quad-Flonum] produced by this
   library, @racket[#f] otherwise — @racket[Quad-Flonum]'s runtime counterpart,
   and the predicate the procedure signatures below are written against.}
+
+The public entry point preserves its type information when used from Typed
+Racket:
+
+@racketmod[
+typed/racket/base
+(require quad-fp)
+(: square (Quad-Flonum -> Quad-Flonum))
+(define (square x) (qf* x x))
+(quad-flonum->string (square (string->quad-flonum "1.25")))
+]
+
+This usage is compiled and exercised by the package's typed-client test.
 
 @section{Conversion}
 
@@ -139,27 +136,49 @@ arithmetic and does not need the static types can
   @defproc[(quad-flonum->string [q Quad?]
                                  [precision (integer-in 1 12000) 36]) string?]
 )]{
-  Parse a decimal string into a quad, and render a quad to a decimal string with
-  up to @racket[precision] significant digits. Decimal conversion is
+  Parse a C-locale number accepted by @tt{strtoflt128}, and render a quad to a
+  decimal string with up to @racket[precision] significant digits. Accepted
+  input includes decimal and hexadecimal floating-point syntax, signed
+  infinities, and NaNs (including payload syntax). Decimal conversion is
   locale-independent and always uses @litchar{.} as the decimal separator.
 
   Apart from surrounding C-locale whitespace,
   @racket[string->quad-flonum] requires the entire input to be consumed as a
   valid number; malformed strings and strings with trailing nonnumeric text
-  raise an exception instead of silently producing the value of a numeric
-  prefix.
+  raise @racket[exn:fail:contract] instead of silently producing the value of a
+  numeric prefix. A syntactically valid value outside binary128's range is not
+  a parse error: overflow produces signed infinity and underflow produces signed
+  zero.
 
   @racket[quad-flonum->string] accepts precisions from 1 through 12000 and
   sizes its output dynamically, so it returns the complete representation even
-  when it is longer than a small fixed buffer. The default of 36 is
-  @racket[quad-decimal-dig], the number of digits sufficient to round-trip any
-  binary128 value exactly.}
+  when it is longer than a small fixed buffer. The maximum exceeds the roughly
+  11,600 significant digits needed by the longest exact finite binary128
+  expansion. The default of 36 is @racket[quad-decimal-dig], the number of
+  digits sufficient to round-trip any finite binary128 value exactly. Textual
+  NaN formatting does not preserve payload or signalling state.}
 
 @defproc[(quad-flonum->bytes [q Quad?]) bytes?]{
   Returns the 16-byte object representation of @racket[q]'s @tt{__float128}
   value in the platform's native byte order. On x86-64 this is the value's
   little-endian byte string. The representation is platform-dependent and is
   not a portable serialization format.}
+
+@section{IEEE 754 behavior and errors}
+
+Arithmetic and mathematical domain errors follow GCC/libquadmath floating-point
+semantics instead of raising Racket exceptions. For example, division by zero
+produces signed infinity, invalid operations produce NaN, and overflow or
+underflow produces infinity, subnormal values, or signed zero as appropriate.
+The binding does not expose C @tt{errno} or floating-point exception flags.
+
+NaN is unordered: every comparison involving NaN, including @racket[qf=],
+returns @racket[#f]. Positive and negative zero compare equal, while
+@racket[qfsignbit?] distinguishes them. @racket[qfmin] and @racket[qfmax]
+follow @tt{fminq}/@tt{fmaxq}: if exactly one operand is NaN they return the
+numeric operand. When both operands are zeros with different signs, the returned
+zero's sign follows the libquadmath implementation; use @racket[qfcopysign] when
+the sign is semantically important.
 
 @section{Arithmetic}
 
@@ -193,7 +212,8 @@ arithmetic and does not need the static types can
   @defproc[(qflog1p [a Quad?]) Quad?]
 )]{
   Exponentials (@racket[qfexpm1] computes @math{e^x-1} accurately near 0) and
-  logarithms (@racket[qflog1p] computes @math{log(1+x)}).}
+  logarithms (@racket[qflog1p] computes @math{log(1+x)}).
+  @racket[qfexp2] is implemented as @tt{powq(2,x)}, not @tt{exp2q}.}
 
 @deftogether[(
   @defproc[(qfsin [a Quad?]) Quad?]
@@ -245,7 +265,9 @@ arithmetic and does not need the static types can
 )]{
   Error functions, log-gamma and gamma, and Bessel functions of the first
   (@racket[qfj0], @racket[qfj1]) and second (@racket[qfy0], @racket[qfy1])
-  kind, orders 0 and 1.
+  kind, orders 0 and 1. @racket[qflgamma] returns
+  @math{log(|Gamma(a)|)}; the sign reported through C's @tt{signgam} is not
+  exposed.
 
   @bold{Concurrency note:} libquadmath's @tt{lgammaq}, which implements
   @racket[qflgamma], writes the process-global C variable @tt{signgam}. That
@@ -339,4 +361,3 @@ arithmetic and does not need the static types can
   sufficient for every binary128 value to survive a
   binary128-to-decimal-to-binary128 round trip. The remaining constants give
   the binary and decimal exponent ranges.}
-
