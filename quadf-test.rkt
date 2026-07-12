@@ -91,14 +91,44 @@
   (test-case "string <-> quad"
     (check-true (qf= (string->quad-flonum "2") (qf 2.0)) "parse integer")
     (check-true (qf= (string->quad-flonum "1.5") (qf 1.5)) "parse decimal")
+    (check-true (qf= (string->quad-flonum " \t1.5\r\n") (qf 1.5))
+                "surrounding C-locale whitespace is accepted")
+    (check-equal? (quad-flonum->string (string->quad-flonum "1.5") 5)
+                  "1.5"
+                  "conversion always uses a dot decimal separator")
+    (for ([bad (in-list (list "" " " "not-a-number" "1.25junk" "1 2" "1\0.25"))])
+      (check-exn #rx"exactly one quad-precision number"
+                 (lambda () (string->quad-flonum bad))
+                 (format "reject malformed input ~s" bad)))
     ;; 36 significant digits round-trips binary128 exactly.
     (check-true (qf= quad-pi (string->quad-flonum (quad-flonum->string quad-pi)))
                 "string round-trip is exact")
-    (check-true (string? (quad-flonum->string (qf 1.0) 5)) "precision arg accepted"))
+    (check-true (string? (quad-flonum->string (qf 1.0) 5)) "precision arg accepted")
+    ;; The smallest subnormal exercises both the maximum supported precision
+    ;; and the retry path beyond the formatter's initial 128-byte buffer.
+    (define exact-denorm (quad-flonum->string quad-denorm-min 12000))
+    (check-true (> (string-length exact-denorm) 11000)
+                "high precision output is not truncated")
+    (check-true (qf= quad-denorm-min (string->quad-flonum exact-denorm))
+                "high precision output round-trips")
+    (for ([bad-precision (in-list (list 0 -1 12001 (expt 2 100) 1/2))])
+      (check-exn exn:fail:contract?
+                 (lambda () (quad-flonum->string quad-pi bad-precision))
+                 (format "reject precision ~s" bad-precision))))
 
   (test-case "constants"
     (check-equal? quad-mant-dig 113 "binary128 mantissa bits")
-    (check-equal? quad-decimal-dig 33 "round-trippable decimal digits")
+    (check-equal? quad-dig 33 "decimal source digits preserved by binary128")
+    (check-equal? quad-decimal-dig 36 "digits sufficient to round-trip binary128")
+    (define next-one (qfnextafter (qf 1.0) (qf 2.0)))
+    (check-false
+     (qf= next-one
+          (string->quad-flonum (quad-flonum->string next-one quad-dig)))
+     "FLT128_DIG is not a binary128-to-decimal round-trip guarantee")
+    (check-true
+     (qf= next-one
+          (string->quad-flonum (quad-flonum->string next-one quad-decimal-dig)))
+     "FLT128_DECIMAL_DIG round-trips binary128")
     ;; sqrt is correctly rounded on recent libquadmath, faithfully rounded on
     ;; older builds — so compare the parsed constant to within a few ULP.
     (check-true (qclose? quad-sqrt2 (qfsqrt (qf 2.0))) "sqrt2 constant")

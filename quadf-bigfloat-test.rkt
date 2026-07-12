@@ -58,7 +58,9 @@
   (define (exact? q-result bf-result)
     (bf= (q->bf q-result) bf-result))
 
-  ;; Relative tolerances (1 ULP = 2^-112 for binary128). The bounds looser than
+  ;; Relative tolerances. Across a normalized binary128 binade, one ULP ranges
+  ;; from 2^-112 to just over 2^-113 of the value, so a fixed relative bound
+  ;; corresponds to a factor-of-two range of ULP counts. The bounds looser than
   ;; "exact" accommodate older libquadmath builds (e.g. the package server's):
   ;;   sqrt  — without soft-fp, sqrtq refines a (double)sqrt seed with Newton
   ;;           steps and no final correcting rounding, so it is faithfully
@@ -68,11 +70,11 @@
   ;;           lacks the round-to-odd step, so it can double-round by <=1 ULP.
   ;;   gamma — tgammaq varies most by version: glibc's binary128 tgamma peaks
   ;;           near 11 ULP, but the server's older libquadmath exceeds 64 ULP.
-  ;;           4M ULP still pins ~27 correct digits — enough to catch a mis-bound
-  ;;           function, bad marshalling, or a wrong scale, which is the point.
-  (define TOL-RND (2^ -110)) ;     4 ULP — near-correctly-rounded (sqrt, fma)
-  (define TOL (2^ -106)) ;        64 ULP — transcendentals
-  (define TOL-GAMMA (2^ -90)) ; ~4M ULP — gamma (version-dependent; see above)
+  ;;           A 2^-90 relative bound still pins ~27 correct digits — enough to
+  ;;           catch a mis-bound function, bad marshalling, or a wrong scale.
+  (define TOL-RND (2^ -110)) ; ~4–8 ULP — near-correctly-rounded (sqrt, fma)
+  (define TOL (2^ -106)) ;      ~64–128 ULP — transcendentals
+  (define TOL-GAMMA (2^ -90)) ; ~4–8M ULP — gamma (version-dependent; see above)
   (define (approx? q-result bf-result [tol TOL])
     (define got (q->bf q-result))
     (if (bfzero? bf-result)
@@ -99,13 +101,13 @@
     (check-property cfg
                     (property ([a (gen:val)] [b (gen:val)])
                               (exact? (qf/ (car a) (car b)) (bf/ (cdr a) (cdr b))))))
-  (test-case "qfsqrt ~ bfsqrt (<= 4 ULP; bit-exact on recent libquadmath)"
+  (test-case "qfsqrt ~ bfsqrt (relative error <= 2^-110; often bit-exact)"
     (check-property cfg
                     (property ([a (gen:val #:sign 'nonneg)])
                               (approx? (qfsqrt (car a)) (bfsqrt (cdr a)) TOL-RND))))
   (test-case "qfabs = bfabs"
     (check-property cfg (property ([a (gen:val)]) (exact? (qfabs (car a)) (bfabs (cdr a))))))
-  (test-case "qffma ~ round(a*b+c) with a single rounding (<= 4 ULP)"
+  (test-case "qffma ~ round(a*b+c) with relative error <= 2^-110"
     (check-property cfg
                     (property ([a (gen:val #:emin -40 #:emax 40)] [b (gen:val #:emin -40 #:emax 40)]
                                                                   [c (gen:val #:emin -40 #:emax 40)])
@@ -130,7 +132,7 @@
                                    (eq? (qf>= (car a) (car b)) (bf>= x y))
                                    (eq? (qf= (car a) (car b)) (bf= x y))))))
 
-  ;; --- approx: transcendentals within 64 ULP of correctly-rounded bigfloat -
+  ;; --- approx: transcendentals within 2^-106 relative error of bigfloat -----
   ;; Each row: name, our op, bigfloat op, input generator (domain-appropriate).
   (define unary-approx
     (list (list "exp" qfexp bfexp (gen:val #:emin -6 #:emax 6))
@@ -170,16 +172,16 @@
       (check-property cfg (property ([x g]) (approx? (qop (car x)) (bop (cdr x)) tol)))))
 
   ;; binary transcendentals
-  (test-case "qfpow ~ bfexpt (<= 64 ULP)"
+  (test-case "qfpow ~ bfexpt (relative error <= 2^-106)"
     (check-property
      cfg
      (property ([base (gen:val #:emin -5 #:emax 5 #:sign 'nonneg)] [ex (gen:val-in -10 10)])
                (approx? (qfpow (car base) (car ex)) (bfexpt (cdr base) (cdr ex))))))
-  (test-case "qfhypot ~ bfhypot (<= 64 ULP)"
+  (test-case "qfhypot ~ bfhypot (relative error <= 2^-106)"
     (check-property cfg
                     (property ([a (gen:val #:emin -60 #:emax 60)] [b (gen:val #:emin -60 #:emax 60)])
                               (approx? (qfhypot (car a) (car b)) (bfhypot (cdr a) (cdr b))))))
-  (test-case "qfatan2 ~ bfatan2 (<= 64 ULP)"
+  (test-case "qfatan2 ~ bfatan2 (relative error <= 2^-106)"
     (check-property cfg
                     (property ([a (gen:val)] [b (gen:val)])
                               (approx? (qfatan2 (car a) (car b)) (bfatan2 (cdr a) (cdr b)))))))

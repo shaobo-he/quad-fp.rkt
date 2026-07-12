@@ -104,6 +104,7 @@
          quad-epsilon
          quad-denorm-min
          quad-mant-dig
+         quad-dig
          quad-decimal-dig
          quad-min-exp
          quad-max-exp
@@ -223,17 +224,72 @@
 
 (define-quad quad-flonum->double-flonum (_fun _Quad-pointer -> _double) #:c-id qf2df)
 
-(define-quad string->quad-flonum (_fun _string (r : (_ptr o _Quad)) -> _void -> r) #:c-id str2qf)
+(define-quad string->quad-flonum/raw
+             (_fun _string
+                   (r : (_ptr o _Quad))
+                   -> (status : _int)
+                   -> (values status r))
+             #:c-id str2qf)
 
-(define-quad quad-flonum->string/raw (_fun _Quad-pointer _bytes _int _int -> _int) #:c-id qf2str)
+(define (string-contains-nul? s)
+  (for/or ([c (in-string s)])
+    (char=? c #\nul)))
+
+(define (string->quad-flonum s)
+  (unless (string? s)
+    (raise-argument-error 'string->quad-flonum "string?" s))
+  ;; A C string ends at NUL, so reject embedded NULs instead of accidentally
+  ;; accepting only the prefix before one.
+  (when (string-contains-nul? s)
+    (raise-arguments-error
+     'string->quad-flonum
+     "expected a string containing exactly one quad-precision number"
+     "string"
+     s))
+  (define-values (status result) (string->quad-flonum/raw s))
+  (case status
+    [(0) result]
+    [(1)
+     (raise-arguments-error
+      'string->quad-flonum
+      "expected a string containing exactly one quad-precision number"
+      "string"
+      s)]
+    [else
+     (error 'string->quad-flonum
+            "could not activate the C numeric locale for conversion")]))
+
+(define-quad quad-flonum->string/raw
+             (_fun _Quad-pointer _bytes _size _size -> _int)
+             #:c-id qf2str)
+
+;; Every finite binary128 is M*2^E. Even the worst exact terminating decimal
+;; expansion needs fewer than 11,600 significant digits, so 12,000 preserves
+;; every meaningful digit while bounding allocation and conversion work.
+(define max-quad-string-precision 12000)
 
 ;; Render a quad with `precision` significant digits (default 36 round-trips
 ;; binary128 exactly).
 (define (quad-flonum->string q [precision 36])
-  (define size 128)
-  (define buf (make-bytes size))
-  (define n (quad-flonum->string/raw q buf size precision))
-  (bytes->string/utf-8 (subbytes buf 0 (max 0 (min n (sub1 size))))))
+  (unless (and (exact-integer? precision)
+               (<= 1 precision max-quad-string-precision))
+    (raise-arguments-error
+     'quad-flonum->string
+     "precision must be an exact integer from 1 through 12000"
+     "precision"
+     precision))
+  (let loop ([size 128])
+    (define buf (make-bytes size))
+    (define n (quad-flonum->string/raw q buf size precision))
+    (cond
+      [(negative? n)
+       (error 'quad-flonum->string
+              "quadmath could not format the value in the C numeric locale")]
+      [(< n size)
+       (bytes->string/utf-8 (subbytes buf 0 n))]
+      [else
+       ;; qf2str has snprintf semantics: n excludes the terminating NUL.
+       (loop (add1 n))])))
 
 ;; --- constants ------------------------------------------------------------
 ;; The libquadmath macro values, parsed to their correctly-rounded binary128.
@@ -258,7 +314,8 @@
 
 ;; Integer characteristics (FLT128_*).
 (define quad-mant-dig 113)
-(define quad-decimal-dig 33)
+(define quad-dig 33)
+(define quad-decimal-dig 36)
 (define quad-min-exp -16381)
 (define quad-max-exp 16384)
 (define quad-min-10-exp -4931)

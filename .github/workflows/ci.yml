@@ -7,8 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  linux-build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # Exercise the install hook's environment parsing as well as the
+      # Makefile's standard compiler/flag overrides.
+      CC: gcc
+      CPPFLAGS: -DQUADF_CI_BUILD=1
+      CFLAGS: -O2 -Wall -Wextra
     steps:
       - uses: actions/checkout@v4
 
@@ -23,17 +29,64 @@ jobs:
           gcc --version | head -1
           racket --version
 
-      # Catalog workflow first: installing as a package pulls the deps and
-      # build-deps (typed-racket-lib, rackcheck-lib, math-lib, …), runs the
-      # native build hook (private/build-native.rkt), and builds the docs —
-      # mirroring what pkgs.racket-lang.org's build server does.
-      - name: Install as a package
-        run: raco pkg install --auto --name quad-fp
+      # Use --copy so the install hook builds in the installed package rather
+      # than leaving a library in this checkout that the Makefile would reuse.
+      - name: Install a copied package (install-hook build)
+        run: raco pkg install --copy --auto --type dir --name quad-fp "$GITHUB_WORKSPACE"
 
       - name: Test installed package
         run: raco test --collection quad-fp
 
-      # Developer workflow: rebuild libquadf via the Makefile and run the suite
-      # directly. Comes after the install so the test deps are available.
-      - name: Build and test (make)
-        run: make test
+      - name: Verify install did not build in the checkout
+        run: test ! -e libquadf.so
+
+      # Clean and build in separate make invocations: make decides whether an
+      # `all` prerequisite is current before it executes a sibling clean goal.
+      - name: Build and test from the checkout (Makefile build)
+        run: |
+          make clean
+          make test
+
+      - name: Test under a comma-decimal locale
+        run: |
+          sudo locale-gen de_DE.UTF-8
+          LC_ALL=de_DE.UTF-8 raco test quadf-test.rkt
+
+  macos-build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GNU GCC with libquadmath
+        run: brew install gcc
+
+      - name: Install Racket
+        uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+
+      - name: Show toolchain
+        run: |
+          for gcc_bin in "$(brew --prefix gcc)"/bin/gcc-[0-9]*; do
+            "$gcc_bin" --version | head -1
+            break
+          done
+          cc --version | head -1
+          racket --version
+
+      # Leave CC unset to exercise the versioned Homebrew-GCC discovery before
+      # the Apple Clang available as /usr/bin/gcc and /usr/bin/cc.
+      - name: Install a copied package (install-hook build)
+        run: |
+          unset CC
+          raco pkg install --copy --auto --type dir --name quad-fp "$GITHUB_WORKSPACE"
+
+      - name: Smoke-test installed package
+        run: racket -e '(require quad-fp) (displayln (quad-flonum->string quad-pi))'
+
+      - name: Build and run unit tests from the checkout (Makefile build)
+        run: |
+          unset CC
+          make clean
+          make all
+          raco test quadf-test.rkt

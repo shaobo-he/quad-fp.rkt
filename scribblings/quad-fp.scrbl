@@ -1,5 +1,6 @@
 #lang scribble/manual
 @(require (for-label racket/base
+                     racket/contract
                      quad-fp))
 
 @title{quad-fp: quadruple-precision floating point}
@@ -37,30 +38,33 @@ present. See the package README for details.}
 @section[#:tag "accuracy"]{Accuracy}
 
 Every result comes straight from libquadmath, so the accuracy is libquadmath's
-and varies slightly across GCC versions. The package's property tests, which
-check each operation against
+and varies across GCC versions. The package's property tests compare the core
+operations and functions for which there is a corresponding
 @hyperlink["https://docs.racket-lang.org/math/bigfloat.html"]{@tt{math/bigfloat}}
-at 113-bit precision, characterize it as follows:
+operation at 113-bit precision. Their regression bounds are:
 
 @itemlist[
-  @item{@racket[qf+], @racket[qf-], @racket[qf*], and @racket[qf/] are
-        @emph{correctly rounded} on every libquadmath: each result is the exact
-        value rounded to the nearest binary128, matching @tt{math/bigfloat} bit
-        for bit.}
-  @item{@racket[qfsqrt] and @racket[qffma] are correctly rounded on recent
-        libquadmath, but only @emph{faithfully rounded} (within one unit in the
-        last place) on older builds. There @tt{sqrtq} refines a @tt{double} seed
-        by Newton's method with no final correcting step, and @tt{fmaq} may
-        double-round by up to one ulp — while still computing a true,
-        cancellation-safe fused multiply-add.}
-  @item{The transcendental and special functions are not guaranteed correctly
-        rounded; in practice they are within a few ulps. The gamma functions
-        @racket[qftgamma] and @racket[qflgamma] are the least accurate and vary
-        the most from one libquadmath to the next.}
+  @item{@racket[qf+], @racket[qf-], @racket[qf*], @racket[qf/], and
+        @racket[qfabs] must match @tt{math/bigfloat} bit for bit for the
+        generated finite inputs.}
+  @item{@racket[qfsqrt] and @racket[qffma] use the relative-error bound
+        @math{2^{-110}} (roughly 4–8 ulps, depending on the significand). They
+        are bit-exact on recent libquadmath builds, while older implementations
+        may be only faithfully rounded or may double-round.}
+  @item{The tested transcendental functions, including @racket[qflgamma], are
+        held to relative error @math{2^{-106}} (roughly 64–128 ulps).
+        @racket[qftgamma] varies much more across libquadmath versions and uses
+        @math{2^{-90}} (roughly 4–8 million ulps), which still requires about
+        27 correct decimal digits.}
 ]
 
-A quad result may therefore differ in its last bit or two from one produced by
-another correctly-rounded library.
+These are conservative regression-test bounds, not universal accuracy
+guarantees from libquadmath. Functions without a @tt{math/bigfloat} counterpart,
+including the Bessel functions, are not covered by those property comparisons.
+When a reference result is zero, the suite treats the same numeric bound as an
+absolute rather than relative error limit.
+Do not rely on bit-for-bit reproducibility of transcendental results across
+libquadmath versions, especially for @racket[qftgamma].
 
 @section[#:tag "performance"]{Performance}
 
@@ -132,17 +136,30 @@ arithmetic and does not need the static types can
 
 @deftogether[(
   @defproc[(string->quad-flonum [s string?]) Quad?]
-  @defproc[(quad-flonum->string [q Quad?] [precision exact-integer? 36]) string?]
+  @defproc[(quad-flonum->string [q Quad?]
+                                 [precision (integer-in 1 12000) 36]) string?]
 )]{
-  Parse a decimal string into a quad (via @tt{strtoflt128}), and render a quad
-  to a decimal string with @racket[precision] significant digits (via
-  @tt{quadmath_snprintf}). The default of 36 digits round-trips binary128
-  exactly.}
+  Parse a decimal string into a quad, and render a quad to a decimal string with
+  up to @racket[precision] significant digits. Decimal conversion is
+  locale-independent and always uses @litchar{.} as the decimal separator.
+
+  Apart from surrounding C-locale whitespace,
+  @racket[string->quad-flonum] requires the entire input to be consumed as a
+  valid number; malformed strings and strings with trailing nonnumeric text
+  raise an exception instead of silently producing the value of a numeric
+  prefix.
+
+  @racket[quad-flonum->string] accepts precisions from 1 through 12000 and
+  sizes its output dynamically, so it returns the complete representation even
+  when it is longer than a small fixed buffer. The default of 36 is
+  @racket[quad-decimal-dig], the number of digits sufficient to round-trip any
+  binary128 value exactly.}
 
 @defproc[(quad-flonum->bytes [q Quad?]) bytes?]{
-  Returns the 16 bytes of @racket[q]'s @tt{__float128} bit pattern, low 64-bit
-  half first and each half in the platform's native byte order — i.e. the
-  value's little-endian byte string on x86-64.}
+  Returns the 16-byte object representation of @racket[q]'s @tt{__float128}
+  value in the platform's native byte order. On x86-64 this is the value's
+  little-endian byte string. The representation is platform-dependent and is
+  not a portable serialization format.}
 
 @section{Arithmetic}
 
@@ -228,7 +245,14 @@ arithmetic and does not need the static types can
 )]{
   Error functions, log-gamma and gamma, and Bessel functions of the first
   (@racket[qfj0], @racket[qfj1]) and second (@racket[qfy0], @racket[qfy1])
-  kind, orders 0 and 1.}
+  kind, orders 0 and 1.
+
+  @bold{Concurrency note:} libquadmath's @tt{lgammaq}, which implements
+  @racket[qflgamma], writes the process-global C variable @tt{signgam}. That
+  makes @racket[qflgamma] unsafe to run concurrently with another
+  @racket[qflgamma] call or with native code outside the package that calls
+  @tt{lgammaq} or accesses @tt{signgam}. Serialize all such access at the
+  application level.}
 
 @section{Other binary functions}
 
@@ -300,12 +324,19 @@ arithmetic and does not need the static types can
 
 @deftogether[(
   @defthing[quad-mant-dig exact-integer?]
+  @defthing[quad-dig exact-integer?]
   @defthing[quad-decimal-dig exact-integer?]
   @defthing[quad-min-exp exact-integer?]
   @defthing[quad-max-exp exact-integer?]
   @defthing[quad-min-10-exp exact-integer?]
   @defthing[quad-max-10-exp exact-integer?]
 )]{
-  Format characteristics: mantissa bits (113), round-trippable decimal digits
-  (33), and the binary and decimal exponent ranges.}
+  Format characteristics corresponding to libquadmath's @tt{FLT128_*} macros.
+  @racket[quad-mant-dig] is the 113-bit significand width.
+  @racket[quad-dig] is 33, the decimal precision: a decimal value with at most
+  that many significant digits survives a decimal-to-binary128-to-decimal
+  conversion unchanged. @racket[quad-decimal-dig] is 36, the number of digits
+  sufficient for every binary128 value to survive a
+  binary128-to-decimal-to-binary128 round trip. The remaining constants give
+  the binary and decimal exponent ranges.}
 

@@ -71,7 +71,7 @@
                        [double-flonum->quad-flonum (Float -> Quad-Flonum)]
                        [quad-flonum->double-flonum (Quad-Flonum -> Float)]
                        [string->quad-flonum (String -> Quad-Flonum)]
-                       [quad-flonum->string (->* (Quad-Flonum) (Integer) String)]
+                       [quad-flonum->string (->* (Quad-Flonum) (Positive-Integer) String)]
                        ;; constants
                        [quad-pi Quad-Flonum]
                        [quad-pi/2 Quad-Flonum]
@@ -91,6 +91,7 @@
                        [quad-epsilon Quad-Flonum]
                        [quad-denorm-min Quad-Flonum]
                        [quad-mant-dig Integer]
+                       [quad-dig Integer]
                        [quad-decimal-dig Integer]
                        [quad-min-exp Integer]
                        [quad-max-exp Integer]

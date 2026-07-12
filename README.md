@@ -26,6 +26,25 @@ A toy [Racket](https://racket-lang.org) binding to GCC's
 - GCC with `libquadmath` and `quadmath.h` (ships with GCC on most Linux distros)
 - Racket (provides `racket` and `raco`)
 
+On macOS, `/usr/bin/gcc` is Apple Clang and does not provide libquadmath.
+Install GCC with Homebrew; the package installer and Makefile automatically
+detect Homebrew's versioned GCC executable:
+
+```sh
+brew install gcc
+raco pkg install --auto --name quad-fp
+```
+
+If auto-detection fails or a specific compiler is required, override `CC`
+(substitute the installed version):
+
+```sh
+CC=gcc-15 raco pkg install --auto --name quad-fp
+```
+
+Both build paths honor `CC`; `CPPFLAGS`, `CFLAGS`, and `PICFLAGS`;
+`LDFLAGS` and `SHARED_LDFLAGS`; and `LDLIBS` and `QUADMATH_LIBS`.
+
 ## Install
 
 As a Racket package (once published to the
@@ -48,13 +67,32 @@ make        # builds libquadf.so (libquadf.dylib on macOS)
 make test   # builds, then runs the unit + property suites
 ```
 
+`make test` assumes the Racket build/test dependencies declared in `info.rkt`
+(`rackcheck-lib`, `math-lib`, and `rackunit-lib`) are installed. From a fresh
+clone, bootstrap them by linking/installing the package once before invoking
+the Makefile:
+
+```sh
+raco pkg install --auto --name quad-fp
+make clean  # force the Makefile to rebuild the installer-created native shim
+make test
+```
+
+The same compiler auto-detection and build-variable overrides apply to both
+commands.
+
 The property suite (`quadf-bigfloat-test.rkt`) checks the operations against
 [`math/bigfloat`](https://docs.racket-lang.org/math/bigfloat.html) at 113-bit
 precision (the binary128 significand): `+ - * /` match bigfloat *bit for bit*
-(they're correctly rounded on every libquadmath); `sqrt` and `fma` are bit-exact
-on recent libquadmath and within a few ULP on older builds; and the
-transcendentals are held to a loose ULP bound (the gamma functions loosest, as
-their accuracy varies most across libquadmath versions).
+for the generated finite inputs. `sqrt` and `fma` use a relative-error bound
+of `2^-110` (roughly 4–8 ULP, depending on the significand); the tested
+transcendentals, including `lgamma`, use `2^-106` (roughly 64–128 ULP); and
+`tgamma` uses the version-tolerant `2^-90` (roughly 4–8 million ULP). That
+last bound still requires about 27 correct decimal digits, but reflects the
+much larger variation seen across libquadmath versions. When the reference is
+zero, the same numeric limits are absolute rather than relative. These are
+regression-test bounds, not guarantees made by libquadmath for every input or
+release.
 
 The modules locate `libquadf` relative to their own source via
 `define-runtime-path`, so once it's built (next to the `.rkt` files, as `make`
@@ -70,7 +108,8 @@ does) the binding works from any working directory.
 (define b (double-flonum->quad-flonum 1e-20))
 
 ;; In double, 1.0 + 1e-20 == 1.0 — the addend is lost. In quad it survives:
-(quad-flonum->double-flonum (qf+ a b))   ; => 1.0000000000000001e0 worth of quad
+(quad-flonum->string (qf+ a b))
+;; => "1.00000000000000000000999999999999995"
 (qf= (qf+ a b) a)                        ; => #f
 ```
 
@@ -91,7 +130,22 @@ The API mirrors libquadmath's real-valued surface:
   full-precision `string->quad-flonum` / `quad-flonum->string`, and (typed
   module) `quad-flonum->bytes`
 - **Constants** — `quad-pi quad-e quad-sqrt2 …`, plus `quad-max quad-epsilon`
-  and format characteristics like `quad-mant-dig` (113)
+  and format characteristics including `quad-mant-dig` (113), `quad-dig` (33
+  decimal digits of precision), and `quad-decimal-dig` (36 digits for a
+  binary128 decimal round trip)
+
+Decimal conversion is locale-independent and always uses `.` as the decimal
+separator. Apart from surrounding C-locale whitespace,
+`string->quad-flonum` requires the whole string to be a valid number instead
+of silently accepting a numeric prefix. `quad-flonum->string` accepts a
+precision from 1 through 12000 (default 36), sizes its output dynamically, and
+returns the complete representation without fixed-buffer truncation.
+
+`qflgamma` ultimately calls libquadmath's `lgammaq`, which writes the
+process-global C variable `signgam`. It is not safe to run `qflgamma`
+concurrently with another `qflgamma` call or with native code outside the
+package that calls `lgammaq` or accesses `signgam`. Serialize all such access
+at the application level.
 
 See the [Scribble docs](scribblings/quad-fp.scrbl) for the full list. Complex
 (`__complex128`) functions and the multi-result functions (`frexpq`, `sincosq`,
