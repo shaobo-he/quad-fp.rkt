@@ -40,6 +40,9 @@ jobs:
       - name: Install a copied package (install-hook build)
         run: raco pkg install --copy --auto --type dir --name quad-fp "$GITHUB_WORKSPACE"
 
+      - name: Check declared package dependencies
+        run: raco setup --check-pkg-deps --pkgs quad-fp
+
       - name: Test installed package
         run: RACKCHECK_TESTS=2000 RACKCHECK_SEED=1337 raco test --collection quad-fp
 
